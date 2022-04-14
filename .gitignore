@@ -1,0 +1,6 @@
+dist
+node_modules
+session/auth/*.json
+session/storage/*.json
+notes.*
+.env

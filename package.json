@@ -1,0 +1,29 @@
+{
+  "name": "wa-baileys",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "build": "tsc -p .",
+    "serve": "node ./dist/app",
+    "dev": "ts-node ./src/app.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@adiwajshing/baileys": "^4.0.1",
+    "chalk": "^5.0.1",
+    "dotenv": "^16.0.0",
+    "express": "^4.17.3",
+    "method-override": "^3.0.0",
+    "mongoose": "^6.2.10"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.13",
+    "@types/express-validator": "^3.0.0",
+    "@types/method-override": "^0.0.32",
+    "@types/node": "^17.0.23"
+  }
+}
