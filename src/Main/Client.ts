@@ -10,6 +10,8 @@ import makeWASocket, {
   useSingleFileLegacyAuthState,
   useSingleFileAuthState,
 } from "@adiwajshing/baileys";
+import EventEmitter from "events";
+class ClientEvent extends EventEmitter {}
 
 import MAIN_LOGGER from "../Utils/logger";
 // const logger = MAIN_LOGGER.child({});
@@ -35,12 +37,13 @@ interface ClientStatus {
   qrCode: string;
 }
 
-export class Client {
+export default class Client {
   private status: string;
   private QrCode: string;
 
-  private sockClient: ClientType;
-  private sock: any;
+  sockClient: ClientType;
+  sock: any;
+  ev: any;
   private state: any;
   private saveState: any;
   private store: any;
@@ -55,6 +58,8 @@ export class Client {
       store: `./session/storage/${file}`,
       multiDevice,
     };
+
+    this.ev = new ClientEvent();
 
     const logger = MAIN_LOGGER.child({});
     logger.level = "silent";
@@ -239,6 +244,12 @@ export class Client {
       console.log("Pindah Socket ke Legacy 🏃‍♂️");
       this.sockClient.multiDevice = false;
     }
+    // kirim event mode diganti
+    this.ev.emit(
+      "deviceModeChanged",
+      this.sockClient.multiDevice ? "MultiDevice" : "Legacy",
+      this.sockClient.multiDevice
+    );
   }
 
   /**
@@ -260,7 +271,7 @@ export class Client {
     this.status = "connected";
   }
 
-  sendMessageWTyping = async (msg: AnyMessageContent, jid: string) => {
+  sendMessageWTyping = async (jid: string, msg: AnyMessageContent) => {
     await this.sock.presenceSubscribe(jid);
     await delay(500);
 

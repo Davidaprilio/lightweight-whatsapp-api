@@ -15,3 +15,11 @@ export const formatPhoneWA = (numberPhone: string, prefix = 62) => {
   }
   return (number += type);
 };
+
+export const formatPhone = (phone: string, prefix = 62): string => {
+  let number = phone.replace(/\D/g, "");
+  if (number.startsWith("0")) {
+    number = prefix + number.substr(1);
+  }
+  return number;
+};
