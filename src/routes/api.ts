@@ -1,12 +1,27 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import fs from "fs";
+const deviceController = require("../controllers/deviceController");
+const sendMessage = require("../controllers/sendMessage");
 import { body } from "express-validator";
+import { validate } from "../Main/Validator";
+import {
+  validateClientConnect,
+  validatePhone,
+  validateUseClient,
+} from "../Main/Validator";
+
 const router = express.Router();
+router.get("/get-sesi", deviceController.getSession);
+router.post("/cek-nomor", sendMessage.get);
 
-import { Client } from "../Main/Client";
+router.post("/device/create", deviceController.create);
 
-let client: Client;
-// import WA = require("../app/controllers/device");
+router.use("/*", validateUseClient); // Cid dan data Device harus ada
+
+router.post("/device/start", deviceController.start);
+
+router.use("/*", validateClientConnect); // Harus Sudah Connect
+router.post("/device/logout", deviceController.logout);
 
 // Device Routes
 router.delete("/device/reset", (req, res) => {
@@ -23,35 +38,30 @@ router.delete("/device/reset", (req, res) => {
   });
 });
 
-router.post("/device/start", async (req, res) => {
-  console.log("client is starting: ", req.body.idName);
-  client = new Client(req.body.idName, req.body.mode);
-  await client.startSock();
-  return res.json({
-    status: true,
+router.post(
+  "/send/text",
+  validate([
+    body("text").not().isEmpty().withMessage("text required").trim().escape(),
+  ]),
+  validatePhone,
+  sendMessage.text
+);
+
+router.post(
+  "/send/button",
+  validate([
+    body("text").not().isEmpty().withMessage("text required").trim().escape(),
+    body("buttons").isArray().withMessage("data must by of type 'Array'"),
+  ]),
+  validatePhone,
+  sendMessage.button
+);
+
+router.all("/*", (req: Request, res: Response) => {
+  return res.status(404).json({
+    status: false,
+    message: "Service Not Found",
+    errors: "this end point not found check url again",
   });
 });
-
-router.post("/device/logout", (req, res) => {
-  console.log("client logout", req.body.idName);
-  client.logout();
-  return res.json({
-    status: true,
-  });
-});
-
-router.post("/send", async (req, res) => {
-  console.log("client logout", req.body.idName);
-  const resp = await client.sendMessageWTyping(
-    {
-      text: req.body.text,
-    },
-    req.body.phone
-  );
-  return res.json({
-    status: true,
-    data: resp,
-  });
-});
-
-module.exports = router;
+export default router;
