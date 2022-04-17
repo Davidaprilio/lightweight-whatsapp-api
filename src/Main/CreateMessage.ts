@@ -1,5 +1,6 @@
 import MessageOptions, { MessageType } from "@adiwajshing/baileys";
 import fs from "fs";
+import Client from "./Client";
 import { formatPhone, formatPhoneWA } from "./Helper";
 
 interface IVCard {
@@ -33,18 +34,21 @@ enum EmoticonReaction {
 }
 
 export default class CreateMessage {
-  private sock: any;
+  private client: any;
+  private timeTyping: number;
   private phone: string;
   private payload: { [k: string]: any } = {};
 
-  constructor(sock: any) {
-    this.sock = sock;
+  constructor(client: Client, timeTyping?: number) {
+    this.client = client;
+    this.timeTyping = timeTyping ?? 2000; //2s
   }
 
-  async send(phone: string): Promise<any> {
+  async send(phone: string, replay?: string): Promise<any> {
     phone = formatPhoneWA(phone);
-    this.phone = phone;
-    return await this.sock.sendMessage(phone, this.payload);
+    const sent = await this.client.sendMessageWithTyping(phone, this.payload);
+    console.log("disend.. ", sent);
+    return sent;
   }
 
   /**
