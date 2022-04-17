@@ -14,6 +14,7 @@ import EventEmitter from "events";
 class ClientEvent extends EventEmitter {}
 
 import MAIN_LOGGER from "../Utils/logger";
+import { formatPhoneWA } from "./Helper";
 // const logger = MAIN_LOGGER.child({});
 // logger.level = "debug";
 
@@ -42,7 +43,7 @@ export default class Client {
   private QrCode: string;
 
   sockClient: ClientType;
-  sock: any;
+  sock: any; // Socket dari makeWALegacySocket | makeWASocket
   ev: any;
   private state: any;
   private saveState: any;
@@ -92,10 +93,6 @@ export default class Client {
       if (!msg.key.fromMe && m.type === "notify") {
         console.log("replying to", m.messages[0].key.remoteJid);
         await this.sock!.chatRead(msg.key, 1);
-        await this.sendMessageWTyping(
-          { text: "Hello there!" },
-          msg.key.remoteJid
-        );
       }
     });
 
@@ -156,7 +153,9 @@ export default class Client {
       ? " Multi Device "
       : "=== Legacy ===";
     console.log(`======================${typeMode}======================`);
-    console.log(` Using WA v${version.join(".")}, isLatest: ${isLatest}`);
+    console.log(
+      ` Using WA v${version.join(".")}, isLatest: ${isLatest} cid: ${host}`
+    );
     console.log("==========================================================");
 
     // coba mengambil auth session
@@ -224,6 +223,13 @@ export default class Client {
       console.log("Connection Open", update);
       if (update.qr !== undefined) {
         console.log("QR Code Update");
+      } else if (update?.legacy.phoneConnected === true) {
+        this.ev.emit(
+          "device.connected",
+          this.sockClient.id,
+          update.legacy.user,
+          this.getDeviceMode()
+        );
       }
     }
     // console.log("connection update", update);
@@ -246,10 +252,13 @@ export default class Client {
     }
     // kirim event mode diganti
     this.ev.emit(
-      "deviceModeChanged",
-      this.sockClient.multiDevice ? "MultiDevice" : "Legacy",
+      "device.changeMode",
+      this.getDeviceMode(),
       this.sockClient.multiDevice
     );
+  }
+  private getDeviceMode() {
+    return this.sockClient.multiDevice ? "MultiDevice" : "Legacy";
   }
 
   /**
@@ -271,32 +280,28 @@ export default class Client {
     this.status = "connected";
   }
 
-  sendMessageWTyping = async (jid: string, msg: AnyMessageContent) => {
+  sendMessageWithTyping = async (
+    jid: string,
+    msg: AnyMessageContent,
+    // replayMsgId?: string,
+    timeTyping?: number
+  ) => {
     await this.sock.presenceSubscribe(jid);
     await delay(500);
 
     await this.sock.sendPresenceUpdate("composing", jid);
-    await delay(2000);
+    await delay(timeTyping ?? 2000); //ms
 
     await this.sock.sendPresenceUpdate("paused", jid);
-
+    // const msgId = replayMsgId == null ? null : { quoted: replayMsgId };
     return await this.sock.sendMessage(jid, msg);
   };
 
-  formatPhoneWA = (numberPhone: string, prefix = 62) => {
-    var type: string;
-    if (numberPhone.endsWith("@g.us")) {
-      type = "@g.us";
-    } else {
-      type = "@c.us";
-    }
-
-    // 1. menghilangkan karakter selain angka
-    let number: string = numberPhone.replace(/\D/g, "");
-    // 2. ganti angka 0 didepan menjadi prefix
-    if (number.startsWith("0")) {
-      number = prefix + number.substr(1);
-    }
-    return (number += type);
-  };
+  /**
+   * Checking Phone Number is Registration on Whatsapp
+   */
+  async isRegistWA(numberPhone: string): Promise<boolean> {
+    const res = await this.sock.onWhatsApp(formatPhoneWA(numberPhone));
+    return res?.exists ?? false;
+  }
 }
