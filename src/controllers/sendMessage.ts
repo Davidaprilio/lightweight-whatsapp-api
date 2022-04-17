@@ -45,3 +45,19 @@ exports.button = async (req: Request, res: Response) => {
     },
   });
 };
+
+exports.contact = async (req: Request, res: Response) => {
+  const Msg = new CreateMessage(clientSession[req.body.cid]);
+  const sendMsg = await Msg.contact(req.body.contacts[0]).send(req.body.phone);
+  return res.status(200).json({
+    status: true,
+    data: {
+      sent: sendMsg.status == 2,
+      status: sendMsg.status ?? 0,
+      message: sendMsg.status == 2 ? "message sent" : "fail sending message",
+      id: sendMsg.key.id,
+      to: req.body.phone,
+      timestamp: sendMsg.messageTimestamp,
+    },
+  });
+};

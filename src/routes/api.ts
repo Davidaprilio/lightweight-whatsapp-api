@@ -51,10 +51,20 @@ router.post(
   "/send/button",
   validate([
     body("text").not().isEmpty().withMessage("text required").trim().escape(),
-    body("buttons").isArray().withMessage("data must by of type 'Array'"),
+    body("buttons").isArray().withMessage("buttons must by of type 'Array'"),
   ]),
   validatePhone,
   sendMessage.button
+);
+
+router.post(
+  "/send/contact",
+  validate([
+    body("name").not().isEmpty().withMessage("name required").trim().escape(),
+    body("contacts").isArray().withMessage("contacts must by of type 'Array'"),
+  ]),
+  validatePhone,
+  sendMessage.contact
 );
 
 router.all("/*", (req: Request, res: Response) => {
