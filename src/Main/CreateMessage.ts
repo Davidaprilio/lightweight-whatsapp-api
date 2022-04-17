@@ -121,7 +121,7 @@ export default class CreateMessage {
     const buttonCollect = [];
     buttons.forEach((button) => {
       buttonCollect.push({
-        buttonId: "btn-" + (buttonCollect.length + 1),
+        buttonId: button.id ?? "btn-" + (buttonCollect.length + 1),
         buttonText: {
           displayText: button.text,
         },
@@ -237,12 +237,3 @@ export default class CreateMessage {
     return this.payload;
   }
 }
-
-const sendMsg = new CreateMessage("085231028718");
-sendMsg
-  .text("Hallo")
-  .contact({
-    name: "David A",
-    phone: "019373263",
-  })
-  .print();
