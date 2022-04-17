@@ -15,17 +15,9 @@ exports.get = async (req: Request, res: Response) => {
 exports.text = async (req: Request, res: Response) => {
   const Msg = new CreateMessage(clientSession[req.body.cid]);
   const sendMsg = await Msg.text(req.body.text).send(req.body.phone);
-  return res.status(200).json({
-    status: true,
-    data: {
-      sent: sendMsg.status == 2,
-      status: sendMsg.status ?? 0,
-      message: sendMsg.status == 2 ? "message sent" : "fail sending message",
-      id: sendMsg.key.id,
-      to: req.body.phone,
-      timestamp: sendMsg.messageTimestamp,
-    },
-  });
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
 };
 
 exports.button = async (req: Request, res: Response) => {
@@ -33,31 +25,39 @@ exports.button = async (req: Request, res: Response) => {
   const sendMsg = await Msg.text(req.body.text)
     .button(req.body.buttons, req.body.footer)
     .send(req.body.phone);
-  return res.status(200).json({
-    status: true,
-    data: {
-      sent: sendMsg.status == 2,
-      status: sendMsg.status ?? 0,
-      message: sendMsg.status == 2 ? "message sent" : "fail sending message",
-      id: sendMsg.key.id,
-      to: req.body.phone,
-      timestamp: sendMsg.messageTimestamp,
-    },
-  });
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
 };
 
 exports.contact = async (req: Request, res: Response) => {
   const Msg = new CreateMessage(clientSession[req.body.cid]);
   const sendMsg = await Msg.contact(req.body.contacts[0]).send(req.body.phone);
-  return res.status(200).json({
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
+};
+
+/**
+ * Create Formating Response from return res Whatsapp
+ */
+const createFormatResponseData = (
+  resSend: any,
+  phone: string,
+  addData?: object
+) => {
+  const format = {
     status: true,
+    message: "OK",
     data: {
-      sent: sendMsg.status == 2,
-      status: sendMsg.status ?? 0,
-      message: sendMsg.status == 2 ? "message sent" : "fail sending message",
-      id: sendMsg.key.id,
-      to: req.body.phone,
-      timestamp: sendMsg.messageTimestamp,
+      sent: resSend.status == 2,
+      status: resSend.status ?? 0,
+      message: resSend.status == 2 ? "message sent" : "fail sending message",
+      id: resSend.key.id,
+      to: phone,
+      timestamp: resSend.messageTimestamp,
     },
-  });
+  };
+
+  return format;
 };
