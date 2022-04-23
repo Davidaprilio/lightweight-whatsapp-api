@@ -66,7 +66,7 @@ function handleEvent(client: Client) {
     "device.changeMode",
     async (modeText: string, multiDevice: boolean) => {
       await Device.findOneAndUpdate(
-        { cid: client.sockClient.id },
+        { cid: client.info.id },
         { mode: multiDevice }
       );
       console.log("ganti Mode dengan handle event: ", modeText);
@@ -77,13 +77,13 @@ function handleEvent(client: Client) {
     "device.connected",
     async (clientId: string, clientInfo: object) => {
       await Device.findOneAndUpdate(
-        { cid: client.sockClient.id },
+        { cid: client.info.id },
         {
           auth: true,
           // lastConnected:
         }
       );
-      console.log("Event: Device Connect", client.sockClient.id);
+      console.log("Event: Device Connect", client.info.id);
     }
   );
 }
