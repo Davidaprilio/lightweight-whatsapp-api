@@ -39,6 +39,19 @@ router.delete("/device/reset", (req, res) => {
 });
 
 router.post(
+  "/api/queue",
+  validate([
+    body("data")
+      .not()
+      .isEmpty()
+      .withMessage("data required")
+      .isArray()
+      .withMessage("data must by of type 'Array'"),
+  ]),
+  sendMessage.sendManyMessage
+);
+
+router.post(
   "/send/text",
   validate([
     body("text").not().isEmpty().withMessage("text required").trim().escape(),
