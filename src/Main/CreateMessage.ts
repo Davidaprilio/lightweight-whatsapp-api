@@ -1,7 +1,7 @@
 import MessageOptions, { MessageType } from "@adiwajshing/baileys";
 import fs from "fs";
 import Client from "./Client";
-import { formatPhone, formatPhoneWA } from "./Helper";
+import { formatPhone, formatPhoneWA, log } from "./Helper";
 
 interface IVCard {
   name: string;
@@ -44,10 +44,24 @@ export default class CreateMessage {
     this.timeTyping = timeTyping ?? 2000; //2s
   }
 
-  async send(phone: string, replay?: string): Promise<any> {
+  async send(
+    phone: string,
+    checkRegistered?: boolean,
+    replay?: string
+  ): Promise<any> {
+    if (checkRegistered ?? false) {
+      const check = await this.client.isRegistWA(phone);
+      if (!check) {
+        return {
+          status: false,
+          isRegister: false,
+          message: "Not Register",
+        };
+      }
+    }
     phone = formatPhoneWA(phone);
     const sent = await this.client.sendMessageWithTyping(phone, this.payload);
-    console.log("disend.. ", sent);
+    log("disend.. ", sent);
     return sent;
   }
 
