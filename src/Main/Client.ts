@@ -325,7 +325,9 @@ export default class Client {
       return {
         status: false,
         error: true,
-        message: "failed to send message, format invalid",
+        message: "failed to send message",
+        response: err?.payload ?? err,
+        err: error.message,
       };
     }
   };
