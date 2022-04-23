@@ -10,19 +10,22 @@ import makeWASocket, {
   useSingleFileLegacyAuthState,
   useSingleFileAuthState,
 } from "@adiwajshing/baileys";
+import Spinnies from "spinnies";
 import EventEmitter from "events";
 class ClientEvent extends EventEmitter {}
 
 import MAIN_LOGGER from "../Utils/logger";
-import { formatPhoneWA } from "./Helper";
+import { formatPhoneWA, log } from "./Helper";
 // const logger = MAIN_LOGGER.child({});
 // logger.level = "debug";
 
-interface ClientType {
+interface ClientInfo {
   id: string;
   multiDevice: boolean;
   auth: string;
   store: string;
+  mode: string;
+  more?: any;
 }
 
 interface ClientStatus {
@@ -42,7 +45,7 @@ export default class Client {
   private status: string;
   private QrCode: string;
 
-  sockClient: ClientType;
+  info: ClientInfo;
   sock: any; // Socket dari makeWALegacySocket | makeWASocket
   ev: any;
   private state: any;
@@ -50,17 +53,20 @@ export default class Client {
   private store: any;
   private logger: any;
   private versionBaileys: object;
+  private spinnies: Spinnies;
 
   constructor(client_id: string, multiDevice: boolean = true) {
     const file = multiDevice ? `${client_id}.json` : `${client_id}-legacy.json`;
-    this.sockClient = {
+    this.info = {
       id: client_id,
       auth: `./session/auth/${file}`,
       store: `./session/storage/${file}`,
       multiDevice,
+      mode: multiDevice ? "md" : "lg",
     };
 
     this.ev = new ClientEvent();
+    this.spinnies = new Spinnies();
 
     const logger = MAIN_LOGGER.child({});
     logger.level = "silent";
@@ -68,7 +74,7 @@ export default class Client {
 
     this.setStatusDeviceDeactive();
     this.store = makeInMemoryStore({ logger });
-    this.store.readFromFile(this.sockClient.store);
+    this.store.readFromFile(this.info.store);
   }
 
   /**
@@ -78,32 +84,35 @@ export default class Client {
     if (this.status == "active") {
       return "Device alredy connected";
     }
+    this.spinnies.add("start-sock", {
+      text: `[${this.info.id}]${this.info.mode} Starting`,
+    });
 
     // buat sock dari client yang diberikan
-    await this.createSock(this.sockClient.id);
+    await this.createSock(this.info.id);
 
     this.store.bind(this.sock.ev);
 
     this.sock.ev.on("messages.upsert", async (m: any) => {
       if (m.type === "append" || m.type === "notify") {
-        console.log(JSON.stringify(m, undefined, 2));
+        log(JSON.stringify(m, undefined, 2));
       }
 
       const msg = m.messages[0];
       if (!msg.key.fromMe && m.type === "notify") {
-        console.log("replying to", m.messages[0].key.remoteJid);
+        log("replying to", m.messages[0].key.remoteJid);
         await this.sock!.chatRead(msg.key, 1);
       }
     });
 
     this.sock.ev.on("messages.update", (m: any) => {
-      console.log("===============  messages.update  ================");
-      console.log(JSON.stringify(m, undefined, 2));
+      log("===============  messages.update  ================");
+      log(JSON.stringify(m, undefined, 2));
     });
 
-    // this.sock.ev.on("presence.update", (m: any) => console.log(m));
-    this.sock.ev.on("chats.update", (m: any) => console.log(m));
-    // this.sock.ev.on("contacts.update", (m: any) => console.log(m));
+    // this.sock.ev.on("presence.update", (m: any) => log(m));
+    this.sock.ev.on("chats.update", (m: any) => log(m));
+    // this.sock.ev.on("contacts.update", (m: any) => log(m));
 
     this.sock.ev.on("connection.update", (update: any) => {
       this.connectionUpdate(update);
@@ -113,7 +122,7 @@ export default class Client {
     this.sock.ev.on("creds.update", this.saveState);
 
     setInterval(() => {
-      this.store.writeToFile(this.sockClient.store);
+      this.store.writeToFile(this.info.store);
     }, 10_000);
 
     return this.sock;
@@ -131,7 +140,7 @@ export default class Client {
   /**
    * Membuat Sock Client
    *
-   * Perlu Mengisi this.sockClient.multiDevice ke true
+   * Perlu Mengisi this.info.multiDevice ke true
    * terlibih dahulu jika ingin menggunakan multi device
    *
    * @param host: Browser Host name
@@ -149,18 +158,17 @@ export default class Client {
     const { version, isLatest } = await fetchLatestBaileysVersion();
     this.versionBaileys = { version, isLatest };
 
-    const typeMode = this.sockClient.multiDevice
+    const typeMode = this.info.multiDevice
       ? " Multi Device "
       : "=== Legacy ===";
-    console.log(`======================${typeMode}======================`);
-    console.log(
-      ` Using WA v${version.join(".")}, isLatest: ${isLatest} cid: ${host}`
-    );
-    console.log("==========================================================");
+
+    log(`======================${typeMode}======================`);
+    log(` Using WA v${version.join(".")}, isLatest: ${isLatest} cid: ${host}`);
+    log("==========================================================");
 
     // coba mengambil auth session
-    if (this.sockClient.multiDevice) {
-      const { state, saveState } = useSingleFileAuthState(this.sockClient.auth);
+    if (this.info.multiDevice) {
+      const { state, saveState } = useSingleFileAuthState(this.info.auth);
       this.state = state;
       this.saveState = saveState;
       this.sock = makeWASocket({
@@ -171,9 +179,7 @@ export default class Client {
         auth: state,
       });
     } else {
-      const { state, saveState } = useSingleFileLegacyAuthState(
-        this.sockClient.auth
-      );
+      const { state, saveState } = useSingleFileLegacyAuthState(this.info.auth);
       this.state = state;
       this.saveState = saveState;
       this.sock = makeWALegacySocket({
@@ -184,6 +190,9 @@ export default class Client {
         auth: state,
       });
     }
+    this.spinnies.update("start-sock", {
+      text: `[${this.info.id}]${this.info.mode} Connecting`,
+    });
     return this.sock;
   }
 
@@ -196,13 +205,15 @@ export default class Client {
 
     if (connection === "close") {
       const err = (lastDisconnect.error as Boom)?.output;
-      console.log("connection Debug:", err?.payload ?? err);
+      log("connection Debug:", err?.payload ?? err);
 
       // Reconnect jika connection close
       // tapi bukan gara-gara Logout
       if (err?.statusCode !== DisconnectReason.loggedOut) {
         const msg = lastDisconnect.error.message;
-
+        this.spinnies.succeed("start-sock", {
+          text: `[${this.info.id}]${this.info.mode} Reconnecting`,
+        });
         // Mode Device Mismatch (yang scan salah mode)
         if (err?.statusCode === 411) {
           this.changeDeviceMode(msg);
@@ -214,25 +225,35 @@ export default class Client {
       }
       // Handle If Logout CODE:401
       else if (err?.statusCode === DisconnectReason.loggedOut) {
-        console.log("Client Is Logout");
+        this.spinnies.succeed("start-sock", {
+          text: `[${this.info.id}]${this.info.mode} Logout`,
+        });
+        log("Client Is Logout");
         this.setStatusDeviceDeactive();
         this.removeSessionPath();
       }
     } // End Connection Close
     else {
-      console.log("Connection Open", update);
+      log("Connection Open", update);
       if (update.qr !== undefined) {
-        console.log("QR Code Update");
+        log("QR Code Update");
+        this.spinnies.update("start-sock", {
+          text: `[${this.info.id}]${this.info.mode} Scanning QRcode`,
+        });
       } else if (update?.legacy.phoneConnected === true) {
+        this.spinnies.succeed("start-sock", {
+          text: `[${this.info.id}]${this.info.mode} Connected`,
+          color: "greenBright",
+        });
         this.ev.emit(
           "device.connected",
-          this.sockClient.id,
+          this.info.id,
           update.legacy.user,
           this.getDeviceMode()
         );
       }
     }
-    // console.log("connection update", update);
+    // log("connection update", update);
   }
 
   /**
@@ -242,34 +263,36 @@ export default class Client {
   private changeDeviceMode(msg: string) {
     // jika Legacy pindah ke socket Multidevice(Beta)
     if (msg === "Require multi-device edition") {
-      console.log("Pindah Socket ke MultiDevice 🏃‍♂️");
-      this.sockClient.multiDevice = true;
+      log("Pindah Socket ke MultiDevice 🏃‍♂️");
+      this.info.multiDevice = true;
+      this.info.mode = "md";
     }
     // jika Multidevice(Beta) pindah ke socket Legacy
     else if (msg === "Multi-device beta not joined") {
-      console.log("Pindah Socket ke Legacy 🏃‍♂️");
-      this.sockClient.multiDevice = false;
+      log("Pindah Socket ke Legacy 🏃‍♂️");
+      this.info.multiDevice = false;
+      this.info.mode = "lg";
     }
     // kirim event mode diganti
     this.ev.emit(
       "device.changeMode",
       this.getDeviceMode(),
-      this.sockClient.multiDevice
+      this.info.multiDevice
     );
   }
   private getDeviceMode() {
-    return this.sockClient.multiDevice ? "MultiDevice" : "Legacy";
+    return this.info.multiDevice ? "MultiDevice" : "Legacy";
   }
 
   /**
    * Handle Remove Session Path
    */
   private removeSessionPath() {
-    if (fs.existsSync(this.sockClient.auth)) {
-      fs.rmSync(this.sockClient.auth, { recursive: true, force: true });
+    if (fs.existsSync(this.info.auth)) {
+      fs.rmSync(this.info.auth, { recursive: true, force: true });
     }
-    if (fs.existsSync(this.sockClient.store)) {
-      fs.rmSync(this.sockClient.store, { recursive: true, force: true });
+    if (fs.existsSync(this.info.store)) {
+      fs.rmSync(this.info.store, { recursive: true, force: true });
     }
   }
 
@@ -294,7 +317,17 @@ export default class Client {
 
     await this.sock.sendPresenceUpdate("paused", jid);
     // const msgId = replayMsgId == null ? null : { quoted: replayMsgId };
-    return await this.sock.sendMessage(jid, msg);
+    try {
+      return await this.sock.sendMessage(jid, msg);
+    } catch (error) {
+      const err = (error as Boom)?.output;
+      console.error("Send message", err?.payload ?? err);
+      return {
+        status: false,
+        error: true,
+        message: "failed to send message, format invalid",
+      };
+    }
   };
 
   /**

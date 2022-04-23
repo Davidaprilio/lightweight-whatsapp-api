@@ -23,3 +23,12 @@ export const formatPhone = (phone: string, prefix = 62): string => {
   }
   return number;
 };
+
+export const log = (...data: any): void => {
+  if (
+    process.env.APP_DEBUG === "true" ||
+    process?.env?.APP_DEBUG === undefined
+  ) {
+    console.log("debug| ", ...data);
+  }
+};
