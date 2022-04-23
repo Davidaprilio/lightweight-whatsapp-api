@@ -33,6 +33,13 @@ enum EmoticonReaction {
   mlongo = "😯",
 }
 
+enum TypeTemplate {
+  button = "button",
+  url = "url",
+  phone = "phone",
+}
+type TemplateType = keyof typeof TypeTemplate;
+
 export default class CreateMessage {
   private client: any;
   private timeTyping: number;
@@ -63,6 +70,11 @@ export default class CreateMessage {
     const sent = await this.client.sendMessageWithTyping(phone, this.payload);
     log("disend.. ", sent);
     return sent;
+  }
+
+  print() {
+    console.log(this.payload);
+    return this.payload;
   }
 
   /**
@@ -182,72 +194,77 @@ export default class CreateMessage {
     return this;
   }
 
-  template(phone: string, textMessage: string) {
-    //send a template message!
-    const templateButtons = [
-      {
-        index: 1,
+  template(type: TemplateType, text: string, data: string): this {
+    if (this.payload.templateButtons === undefined) {
+      this.payload.templateButtons = [];
+    }
+
+    if (type == "url") {
+      this.payload.templateButtons.push({
+        index: this.payload.templateButtons.length + 1,
         urlButton: {
-          displayText: "⭐ Star Baileys on GitHub!",
-          url: "https://github.com/adiwajshing/Baileys",
+          displayText: text,
+          url: data,
         },
-      },
-      {
-        index: 2,
+      });
+    } else if (type == "phone") {
+      this.payload.templateButtons.push({
+        index: this.payload.templateButtons.length + 1,
         callButton: {
-          displayText: "Call me!",
-          phoneNumber: "+1 (234) 5678-901",
+          displayText: text,
+          phoneNumber: data,
         },
-      },
-      {
-        index: 3,
+      });
+    } else if (type == "button") {
+      this.payload.templateButtons.push({
+        index: this.payload.templateButtons.length + 1,
         quickReplyButton: {
           displayText: "This is a reply, just like normal buttons!",
           id: "id-like-buttons-message",
         },
-      },
-    ];
+      });
+    }
+    return this;
+  }
 
-    const templateMessage = {
-      text: "Hi it's a template message",
-      footer: "Hello World",
-      templateButtons: templateButtons,
-    };
+  /**
+   * ================================================================
+   * Kirim Media.
+   * jika caption tidak diisi akan menggunakan text dan
+   * jika text juga tidak ada caption akan kosong
+   * ================================================================
+   */
+  gif(url: string, caption?: string): this {
+    this.video(url, caption);
+    this.payload.gifPlayback = true;
+    return this;
   }
 
   /**
    * Kirim Media
    */
-  gif(phone: string, textMessage: string) {
-    let phon = {
-      video: fs.readFileSync("Media/ma_gif.mp4"),
-      caption: "hello!",
-      gifPlayback: true,
-    };
-
-    // Atau
-    let phonea = {
-      video: "./Media/ma_gif.mp4",
-      caption: "hello!",
-      gifPlayback: true,
-    };
+  image(url: string, caption?: string): this {
+    this.payload.image = { url };
+    this.caption(caption ?? null);
+    return this;
   }
 
-  audio(phone: string, textMessage: string) {
-    // {
-    //   audio: {
-    //     url: "./Media/audio.mp3",
-    //   },
-    //   mimetype: "audio/mp4",
-    // },
-    // {
-    //   url: "Media/audio.mp3",
-    // }
+  video(url: string, caption?: string): this {
+    this.payload.video = { url };
+    this.caption(caption ?? null);
+    this.payload.gifPlayback = false;
+    return this;
+  }
+
+  audio(url: string): this {
     // can send mp3, mp4, & ogg
+    this.payload.audio = { url };
+    this.payload.mimetype = "audio/mp3";
+    return this;
   }
 
-  print() {
-    console.log(this.payload);
-    return this.payload;
+  private caption(text: any): void {
+    this.payload.caption = text ?? this.payload.text ?? "";
+    delete this.payload.text;
   }
 }
