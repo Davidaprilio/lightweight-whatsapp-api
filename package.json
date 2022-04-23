@@ -19,9 +19,12 @@
     "cli-spinners": "^2.6.1",
     "dotenv": "^16.0.0",
     "express": "^4.17.3",
+    "is-image-url-async": "^1.4.0",
+    "link-preview-js": "^2.1.13",
     "method-override": "^3.0.0",
     "mongoose": "^6.2.10",
-    "spinnies": "^0.5.1"
+    "spinnies": "^0.5.1",
+    "url-exists": "^1.0.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.13",
