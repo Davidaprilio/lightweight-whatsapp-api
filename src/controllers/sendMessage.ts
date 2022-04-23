@@ -1,10 +1,7 @@
 import clientSession from "../Main/SessionClient";
-import { NextFunction, Request, Response } from "express";
-import { check } from "express-validator";
-import { validate } from "../Main/Validator";
+import { Request, Response } from "express";
 import CreateMessage from "../Main/CreateMessage";
 import QueueMessage, { queueStatus } from "../models/QueueMessage";
-import { emit } from "process";
 
 exports.get = async (req: Request, res: Response) => {
   // Multidevice
