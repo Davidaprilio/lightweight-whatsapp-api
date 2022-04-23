@@ -1,3 +1,6 @@
+require("dotenv").config();
+import process from "process";
+
 export const formatPhoneWA = (numberPhone: string, prefix = 62) => {
   var type: string;
   if (numberPhone.endsWith("@g.us")) {
