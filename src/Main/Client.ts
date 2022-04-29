@@ -65,8 +65,14 @@ export default class Client {
       mode: multiDevice ? "md" : "lg",
     };
 
+    if (!fs.existsSync("./session/auth"))
+      fs.mkdirSync("./session/auth", { recursive: true });
+
+    if (!fs.existsSync("./session/storage"))
+      fs.mkdirSync("./session/storage", { recursive: true });
+
     this.ev = new ClientEvent();
-    this.spinnies = new Spinnies();
+    // this.spinnies = new Spinnies();
 
     const logger = MAIN_LOGGER.child({});
     logger.level = "silent";
@@ -84,24 +90,46 @@ export default class Client {
     if (this.status == "active") {
       return "Device alredy connected";
     }
-    this.spinnies.add("start-sock", {
-      text: `[${this.info.id}]${this.info.mode} Starting`,
-    });
 
     // buat sock dari client yang diberikan
     await this.createSock(this.info.id);
 
     this.store.bind(this.sock.ev);
 
+    // Set Event
     this.sock.ev.on("messages.upsert", async (m: any) => {
       if (m.type === "append" || m.type === "notify") {
-        log(JSON.stringify(m, undefined, 2));
+        log("Pesan Masuk", JSON.stringify(m, undefined, 2));
       }
 
       const msg = m.messages[0];
-      if (!msg.key.fromMe && m.type === "notify") {
-        log("replying to", m.messages[0].key.remoteJid);
-        await this.sock!.chatRead(msg.key, 1);
+      if (m.type === "notify") {
+        if (!msg.key.fromMe) {
+          log("replying to", msg.key.remoteJid);
+          await this.sock!.chatRead(msg.key, 1);
+        }
+
+        const textMsg = msg?.message?.conversation;
+        const templateButtons = [
+          {
+            index: 1,
+            urlButton: {
+              url: "https://github.com/Davidaprilio",
+              displayText: "visit me",
+            },
+          },
+        ];
+        if (textMsg === "!id") {
+          await this.sendMessageWithTyping(
+            msg.key.remoteJid,
+            {
+              text: "id: " + msg.key.remoteJid,
+              footer: "bot",
+              // templateButtons,
+            },
+            50
+          );
+        }
       }
     });
 
@@ -121,9 +149,14 @@ export default class Client {
     // listen for when the auth credentials is updated
     this.sock.ev.on("creds.update", this.saveState);
 
-    setInterval(() => {
-      this.store.writeToFile(this.info.store);
-    }, 10_000);
+    this.sock.ev.on("messages.reaction", async (a: any, b: any) => {
+      log("Reaction");
+      log(a, b);
+    });
+
+    // setInterval(() => {
+    //   this.store.writeToFile(this.info.store);
+    // }, 10_000);
 
     return this.sock;
   };
@@ -190,9 +223,6 @@ export default class Client {
         auth: state,
       });
     }
-    this.spinnies.update("start-sock", {
-      text: `[${this.info.id}]${this.info.mode} Connecting`,
-    });
     return this.sock;
   }
 
@@ -211,9 +241,6 @@ export default class Client {
       // tapi bukan gara-gara Logout
       if (err?.statusCode !== DisconnectReason.loggedOut) {
         const msg = lastDisconnect.error.message;
-        this.spinnies.succeed("start-sock", {
-          text: `[${this.info.id}]${this.info.mode} Reconnecting`,
-        });
         // Mode Device Mismatch (yang scan salah mode)
         if (err?.statusCode === 411) {
           this.changeDeviceMode(msg);
@@ -225,9 +252,6 @@ export default class Client {
       }
       // Handle If Logout CODE:401
       else if (err?.statusCode === DisconnectReason.loggedOut) {
-        this.spinnies.succeed("start-sock", {
-          text: `[${this.info.id}]${this.info.mode} Logout`,
-        });
         log("Client Is Logout");
         this.setStatusDeviceDeactive();
         this.removeSessionPath();
@@ -237,14 +261,7 @@ export default class Client {
       log("Connection Open", update);
       if (update.qr !== undefined) {
         log("QR Code Update");
-        this.spinnies.update("start-sock", {
-          text: `[${this.info.id}]${this.info.mode} Scanning QRcode`,
-        });
       } else if (update?.legacy.phoneConnected === true) {
-        this.spinnies.succeed("start-sock", {
-          text: `[${this.info.id}]${this.info.mode} Connected`,
-          color: "greenBright",
-        });
         this.ev.emit(
           "device.connected",
           this.info.id,

@@ -51,6 +51,7 @@ router.post(
   sendMessage.sendManyMessage
 );
 
+// Send text route
 router.post(
   "/send/text",
   validate([
@@ -59,7 +60,7 @@ router.post(
   validatePhone,
   sendMessage.text
 );
-
+// Send button route
 router.post(
   "/send/button",
   validate([
@@ -69,7 +70,7 @@ router.post(
   validatePhone,
   sendMessage.button
 );
-
+// Send contact route
 router.post(
   "/send/contact",
   validate([
@@ -78,6 +79,65 @@ router.post(
   ]),
   validatePhone,
   sendMessage.contact
+);
+// Send list route
+router.post(
+  "/send/list",
+  validate([
+    body("text").not().isEmpty().withMessage("text required").trim().escape(),
+    body("data").isArray().withMessage("data must by of type 'Array'"),
+    body("data.*.title").isArray().withMessage("data must by of type 'Array'"),
+    body("data.*.rows").isArray().withMessage("data must by of type 'Array'"),
+  ]),
+  validatePhone,
+  sendMessage.list
+);
+// Send image route
+router.post(
+  "/send/image",
+  validate([
+    body("url").not().isEmpty().withMessage("url required").trim().escape(),
+  ]),
+  validatePhone,
+  sendMessage.image
+);
+// Send video route
+router.post(
+  "/send/video",
+  validate([
+    body("url").not().isEmpty().withMessage("url required").trim().escape(),
+  ]),
+  validatePhone,
+  sendMessage.video
+);
+// Send audio route
+router.post(
+  "/send/audio",
+  validate([
+    body("url").not().isEmpty().withMessage("url required").trim().escape(),
+  ]),
+  validatePhone,
+  sendMessage.audio
+);
+// Send location route
+router.post(
+  "/send/location",
+  validate([
+    body("lat").not().isEmpty().withMessage("lat required").trim().escape(),
+    body("long").not().isEmpty().withMessage("long required").trim().escape(),
+  ]),
+  validatePhone,
+  sendMessage.location
+);
+// Send button-template route
+router.post(
+  "/send/button-template",
+  validate([
+    body("lat").not().isEmpty().withMessage("lat required").trim().escape(),
+    body("long").not().isEmpty().withMessage("long required").trim().escape(),
+  ]),
+  validatePhone,
+  sendMessage.buttonTemplate
 );
 
 router.all("/*", (req: Request, res: Response) => {

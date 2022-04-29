@@ -37,6 +37,96 @@ exports.contact = async (req: Request, res: Response) => {
     .json(createFormatResponseData(sendMsg, req.body.phone));
 };
 
+exports.list = async (req: Request, res: Response) => {
+  const Msg = new CreateMessage(clientSession[req.body.cid]);
+  const sendMsg = await Msg.list(req.body.data).send(req.body.phone);
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
+};
+
+exports.image = async (req: Request, res: Response) => {
+  const Msg = new CreateMessage(clientSession[req.body.cid]);
+  const sendMsg = await Msg.image(req.body.url, req.body.caption).send(
+    req.body.phone
+  );
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
+};
+
+exports.video = async (req: Request, res: Response) => {
+  const Msg = new CreateMessage(clientSession[req.body.cid]);
+  if (req.body.gif ?? false) {
+    Msg.gif(req.body.url, req.body.caption);
+  } else {
+    Msg.video(req.body.url, req.body.caption);
+  }
+  const sendMsg = await Msg.send(req.body.phone);
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
+};
+
+exports.audio = async (req: Request, res: Response) => {
+  const Msg = new CreateMessage(clientSession[req.body.cid]);
+  const sendMsg = await Msg.audio(req.body.url).send(req.body.phone);
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
+};
+
+exports.location = async (req: Request, res: Response) => {
+  const Msg = new CreateMessage(clientSession[req.body.cid]);
+  const sendMsg = await Msg.location(req.body.lat, req.body.long).send(
+    req.body.phone
+  );
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
+};
+
+exports.buttonTemplate = async (req: Request, res: Response) => {
+  const body = req.body;
+  const Msg = new CreateMessage(clientSession[body.cid]);
+  const data = {
+    link: Object.keys(body).indexOf("link"),
+    phone: Object.keys(body).indexOf("phone"),
+    button: Object.keys(body).indexOf("button"),
+  };
+  const dataReady = Object.entries(data).sort(([, a], [, b]) => a - b);
+  let missingData = 0;
+  dataReady.forEach(([name, val]) => {
+    if (val !== -1) {
+      if (name === "link") {
+        Msg.template("url", body[name].text, body[name].url);
+      } else if (name === "phone") {
+        Msg.template("phone", body[name].text, body[name].number);
+      } else if (name === "button") {
+        Msg.template(
+          "button",
+          body[name].text,
+          body[name].id ?? "template-btn-1"
+        );
+      }
+    } else {
+      missingData++;
+    }
+  });
+  if (missingData == 3) {
+    return res.status(402).json({
+      status: true,
+      message: "Bad Request",
+      errors:
+        "missing property. there must be at least one url, link, or button",
+    });
+  }
+  const sendMsg = await Msg.send(req.body.phone);
+  return res
+    .status(200)
+    .json(createFormatResponseData(sendMsg, req.body.phone));
+};
+
 exports.sendManyMessage = async (req: Request, res: Response) => {
   const queId = randString(8);
   const arrData = req.body.data.map((v: any) => ({

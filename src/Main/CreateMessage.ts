@@ -1,4 +1,8 @@
-import MessageOptions, { MessageType } from "@adiwajshing/baileys";
+import MessageOptions, {
+  generateWAMessageFromContent,
+  MessageType,
+  proto,
+} from "@adiwajshing/baileys";
 import fs from "fs";
 import Client from "./Client";
 import { formatPhone, formatPhoneWA, log } from "./Helper";
@@ -186,11 +190,29 @@ export default class CreateMessage {
   /**
    * Add Reaction
    */
-  reaction(key: string, reaction: string): this {
+  reaction(key: string, reaction?: string): this {
     this.payload.react = {
-      text: "👍",
+      text: "💖",
       key,
     };
+    const from = "6281358209109@s.whatsapp.net";
+    const reactionMessage = {
+      text: "💖",
+      key: {
+        remoteJid: from ?? "",
+        id: key ?? "",
+        participant: "",
+      },
+    };
+    const Reactions = generateWAMessageFromContent(
+      from,
+      proto.Message.fromObject({
+        reactionMessage,
+      }),
+      {
+        userJid: from,
+      }
+    );
     return this;
   }
 
@@ -219,8 +241,8 @@ export default class CreateMessage {
       this.payload.templateButtons.push({
         index: this.payload.templateButtons.length + 1,
         quickReplyButton: {
-          displayText: "This is a reply, just like normal buttons!",
-          id: "id-like-buttons-message",
+          displayText: text,
+          id: data,
         },
       });
     }
