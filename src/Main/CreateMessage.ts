@@ -285,7 +285,7 @@ export default class CreateMessage {
     return this;
   }
 
-  private caption(text: any): void {
+  private caption(text: string): void {
     this.payload.caption = text ?? this.payload.text ?? "";
     delete this.payload.text;
   }
