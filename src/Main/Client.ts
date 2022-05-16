@@ -10,7 +10,6 @@ import makeWASocket, {
   useSingleFileLegacyAuthState,
   useSingleFileAuthState,
 } from "@adiwajshing/baileys";
-import Spinnies from "spinnies";
 import EventEmitter from "events";
 class ClientEvent extends EventEmitter {}
 
@@ -72,7 +71,6 @@ export default class Client {
       fs.mkdirSync("./session/storage", { recursive: true });
 
     this.ev = new ClientEvent();
-    // this.spinnies = new Spinnies();
 
     const logger = MAIN_LOGGER.child({});
     logger.level = "silent";
@@ -327,10 +325,10 @@ export default class Client {
     timeTyping?: number
   ) => {
     await this.sock.presenceSubscribe(jid);
-    await delay(500);
+    await delay(100);
 
     await this.sock.sendPresenceUpdate("composing", jid);
-    await delay(timeTyping ?? 2000); //ms
+    await delay(timeTyping ?? 250); //ms
 
     await this.sock.sendPresenceUpdate("paused", jid);
     // const msgId = replayMsgId == null ? null : { quoted: replayMsgId };
