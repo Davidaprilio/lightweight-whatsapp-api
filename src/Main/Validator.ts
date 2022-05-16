@@ -72,7 +72,13 @@ export const validatePhone = async (
   res: Response,
   next: NextFunction
 ) => {
-  await check("phone").not().isEmpty().run(req);
+  await check("phone")
+    .not()
+    .isEmpty()
+    .withMessage("Phone Required")
+    .isString()
+    .withMessage("phone must by of type 'String'")
+    .run(req);
   const errResult = validationResult(req);
   if (errResult.isEmpty()) {
     const check = await clientSession[req.body.cid].isRegistWA(req.body.phone);
@@ -95,7 +101,7 @@ export const validatePhone = async (
     res.status(400).json({
       status: false,
       message: "Bad Request",
-      errors: "phone required",
+      errors: errResult,
     });
     return;
   }
