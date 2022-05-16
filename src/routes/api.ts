@@ -95,27 +95,21 @@ router.post(
 // Send image route
 router.post(
   "/send/image",
-  validate([
-    body("url").not().isEmpty().withMessage("url required").trim().escape(),
-  ]),
+  validate([body("url").not().isEmpty().withMessage("url required")]),
   validatePhone,
   sendMessage.image
 );
 // Send video route
 router.post(
   "/send/video",
-  validate([
-    body("url").not().isEmpty().withMessage("url required").trim().escape(),
-  ]),
+  validate([body("url").not().isEmpty().withMessage("url required")]),
   validatePhone,
   sendMessage.video
 );
 // Send audio route
 router.post(
   "/send/audio",
-  validate([
-    body("url").not().isEmpty().withMessage("url required").trim().escape(),
-  ]),
+  validate([body("url").not().isEmpty().withMessage("url required")]),
   validatePhone,
   sendMessage.audio
 );
