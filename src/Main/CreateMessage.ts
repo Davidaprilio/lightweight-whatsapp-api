@@ -84,8 +84,11 @@ export default class CreateMessage {
   /**
    * Add Text
    */
-  text(textMessage: string): this {
+  text(textMessage: string, footer?: string): this {
     this.payload.text = textMessage;
+    if (footer) {
+      this.payload.footer = footer;
+    }
     return this;
   }
 

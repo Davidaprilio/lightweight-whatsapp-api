@@ -54,9 +54,7 @@ router.post(
 // Send text route
 router.post(
   "/send/text",
-  validate([
-    body("text").not().isEmpty().withMessage("text required").trim().escape(),
-  ]),
+  validate([body("text").not().isEmpty().withMessage("text required").trim()]),
   validatePhone,
   sendMessage.text
 );
@@ -126,10 +124,7 @@ router.post(
 // Send button-template route
 router.post(
   "/send/button-template",
-  validate([
-    body("lat").not().isEmpty().withMessage("lat required").trim().escape(),
-    body("long").not().isEmpty().withMessage("long required").trim().escape(),
-  ]),
+  validate([body("text").not().isEmpty().withMessage("text required")]),
   validatePhone,
   sendMessage.buttonTemplate
 );

@@ -40,19 +40,21 @@ interface ClientStatus {
   qrCode: string;
 }
 
-export default class Client {
-  private status: string;
-  private QrCode: string;
+interface QueueMessage {
+  type: string;
+  text: string;
+}
 
+export default class Client {
   info: ClientInfo;
   sock: any; // Socket dari makeWALegacySocket | makeWASocket
   ev: any;
-  private state: any;
+
+  private queueMessage: [];
+  private status: string;
   private saveState: any;
   private store: any;
   private logger: any;
-  private versionBaileys: object;
-  private spinnies: Spinnies;
 
   constructor(client_id: string, multiDevice: boolean = true) {
     const file = multiDevice ? `${client_id}.json` : `${client_id}-legacy.json`;
@@ -187,7 +189,6 @@ export default class Client {
   ) {
     // Cek Latest version dari Baileys
     const { version, isLatest } = await fetchLatestBaileysVersion();
-    this.versionBaileys = { version, isLatest };
 
     const typeMode = this.info.multiDevice
       ? " Multi Device "
@@ -200,7 +201,6 @@ export default class Client {
     // coba mengambil auth session
     if (this.info.multiDevice) {
       const { state, saveState } = useSingleFileAuthState(this.info.auth);
-      this.state = state;
       this.saveState = saveState;
       this.sock = makeWASocket({
         version,
@@ -211,7 +211,6 @@ export default class Client {
       });
     } else {
       const { state, saveState } = useSingleFileLegacyAuthState(this.info.auth);
-      this.state = state;
       this.saveState = saveState;
       this.sock = makeWALegacySocket({
         version,
