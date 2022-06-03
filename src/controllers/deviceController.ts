@@ -54,6 +54,14 @@ exports.create = async (req: Request, res: Response) => {
     });
 };
 
+exports.listDevice = async (req: Request, res: Response) => {
+  // get all Client
+  const devices = await Device.find();
+  res.render("clients/list", {
+    devices,
+  });
+};
+
 export const handleStart = async (cid: string, mode: boolean) => {
   clientSession[cid] = new Client(cid, mode);
   await clientSession[cid].startSock();

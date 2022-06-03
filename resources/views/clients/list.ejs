@@ -1,0 +1,68 @@
+<%- include('../layouts/header') %>
+<div
+  class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom"
+>
+  <h2 class="h2">Your Device</h2>
+  <div class="btn-toolbar mb-2 mb-md-0">
+    <div class="btn-group me-2">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-dark btn-outline-secondary"
+      >
+        Share
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-dark btn-outline-secondary"
+      >
+        Export
+      </button>
+    </div>
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-dark btn-outline-secondary dropdown-toggle"
+    >
+      <span data-feather="calendar" class="align-text-bottom"></span>
+      This week
+    </button>
+  </div>
+</div>
+
+<div class="row">
+  <% devices.forEach(device => { %>
+  <div class="col-6 col-md-4 col-lg-3">
+    <div class="border rounded bg-white shadow-sm">
+      <div class="p-2">
+        <h6><%= device.label %></h6>
+        <p>status: <%= device.auth ? 'Connected' : 'Disconnected' %></p>
+        <p><%= device.description %></p>
+        <p><%= device.location %></p>
+        <p><%= device.last_seen %></p>
+      </div>
+      <div class="d-flex flex-nowrap text-center border-top">
+        <button
+          class="btn btn-link text-decoration-none rounded-0 flex-grow-1 border-end"
+        >
+          Btn 1
+        </button>
+        <button class="btn btn-link text-decoration-none rounded-0 flex-grow-1">
+          Btn 2
+        </button>
+      </div>
+    </div>
+  </div>
+  <% }) %>
+</div>
+
+<!-- <div class="btn-group mt-5">
+  <div class="btn btn-sm btn-outline-dark">1</div>
+  <div class="btn btn-sm btn-outline-dark"><<</div>
+  <div class="btn btn-sm btn-outline-dark">...</div>
+  <div class="btn btn-sm btn-outline-dark">7</div>
+  <div class="btn btn-sm btn-outline-dark">5</div>
+  <div class="btn btn-sm btn-outline-dark">6</div>
+  <div class="btn btn-sm btn-outline-dark">...</div>
+  <div class="btn btn-sm btn-outline-dark">>></div>
+  <div class="btn btn-sm btn-outline-dark">10</div>
+</div> -->
+<%- include('../layouts/footer') %>

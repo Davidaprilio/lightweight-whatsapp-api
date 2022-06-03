@@ -5,8 +5,8 @@
   "main": "app.js",
   "scripts": {
     "build": "tsc -p .",
-    "serve": "node ./dist/app",
-    "dev": "ts-node ./src/app.ts",
+    "serve": "node ./app",
+    "dev": "ts-node ./app.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -14,10 +14,12 @@
   "license": "ISC",
   "dependencies": {
     "@adiwajshing/baileys": "^4.0.1",
+    "@adiwajshing/keyed-db": "^0.2.4",
     "@types/spinnies": "^0.5.0",
     "chalk": "^5.0.1",
     "cli-spinners": "^2.6.1",
     "dotenv": "^16.0.0",
+    "ejs": "^3.1.8",
     "express": "^4.17.3",
     "is-image-url-async": "^1.4.0",
     "link-preview-js": "^2.1.13",
