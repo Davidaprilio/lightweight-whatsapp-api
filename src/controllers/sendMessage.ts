@@ -89,9 +89,11 @@ exports.location = async (req: Request, res: Response) => {
 exports.buttonTemplate = async (req: Request, res: Response) => {
   const body = req.body;
   const Msg = new CreateMessage(clientSession[body.cid]);
+  Msg.text(body.text, body.footer ?? null);
+
   const data = {
     link: Object.keys(body).indexOf("link"),
-    phone: Object.keys(body).indexOf("phone"),
+    call: Object.keys(body).indexOf("call"),
     button: Object.keys(body).indexOf("button"),
   };
   const dataReady = Object.entries(data).sort(([, a], [, b]) => a - b);
@@ -100,7 +102,7 @@ exports.buttonTemplate = async (req: Request, res: Response) => {
     if (val !== -1) {
       if (name === "link") {
         Msg.template("url", body[name].text, body[name].url);
-      } else if (name === "phone") {
+      } else if (name === "call") {
         Msg.template("phone", body[name].text, body[name].number);
       } else if (name === "button") {
         Msg.template(
