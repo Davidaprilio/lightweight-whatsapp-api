@@ -61,37 +61,41 @@ exports.listDevice = async (req: Request, res: Response) => {
     devices,
   });
 };
+exports.view = async (req: Request, res: Response) => {
+  // find id in Client
+  const device = await Device.find({ _id: req.params.deviceID });
+  res.render("clients/view", {
+    device: device[0],
+  });
+};
 
 export const handleStart = async (cid: string, mode: boolean) => {
   clientSession[cid] = new Client(cid, mode);
   await clientSession[cid].startSock();
-  handleEvent(clientSession[cid]);
   return;
 };
 
-function handleEvent(client: Client) {
-  client.ev.on(
-    "device.changeMode",
-    async (modeText: string, multiDevice: boolean) => {
-      await Device.findOneAndUpdate(
-        { cid: client.info.id },
-        { mode: multiDevice }
-      );
-      console.log("ganti Mode dengan handle event: ", modeText);
-    }
-  );
+// client.ev.on(
+//   "device.changeMode",
+//   async (modeText: string, multiDevice: boolean) => {
+//     await Device.findOneAndUpdate(
+//       { cid: client.info.id },
+//       { mode: multiDevice }
+//     );
+//     console.log("ganti Mode dengan handle event: ", modeText);
+//   }
+// );
 
-  client.ev.on(
-    "device.connected",
-    async (clientId: string, clientInfo: object) => {
-      await Device.findOneAndUpdate(
-        { cid: client.info.id },
-        {
-          auth: true,
-          // lastConnected:
-        }
-      );
-      console.log("Event: Device Connect", client.info.id);
-    }
-  );
-}
+// client.ev.on(
+//   "device.connected",
+//   async (clientId: string, clientInfo: object) => {
+//     await Device.findOneAndUpdate(
+//       { cid: client.info.id },
+//       {
+//         auth: true,
+//         // lastConnected:
+//       }
+//     );
+//     console.log("Event: Device Connect", client.info.id);
+//   }
+// );

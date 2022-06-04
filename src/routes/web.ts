@@ -14,6 +14,6 @@ const router = express.Router();
 
 router.get("/dashboard", userController.dashboard);
 router.get("/clients", deviceController.listDevice);
-// router.get("/device/:deviceID", deviceController.view);
+router.get("/client/:deviceID", deviceController.view);
 
 export default router;

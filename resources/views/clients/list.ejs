@@ -40,13 +40,14 @@
         <p><%= device.last_seen %></p>
       </div>
       <div class="d-flex flex-nowrap text-center border-top">
-        <button
+        <a
+          href="<%=baseURL%>/client/<%= device._id %>"
           class="btn btn-link text-decoration-none rounded-0 flex-grow-1 border-end"
         >
-          Btn 1
-        </button>
+          View
+        </a>
         <button class="btn btn-link text-decoration-none rounded-0 flex-grow-1">
-          Btn 2
+          Test
         </button>
       </div>
     </div>
