@@ -19,6 +19,13 @@ export const formatPhoneWA = (numberPhone: string, prefix = 62) => {
   return (number += type);
 };
 
+export const jidToNumberPhone = (jid) => {
+  jid = jid.split("@")[0];
+  jid = jid.split(":")[0];
+  jid = jid.replace(/[^0-9]/g, "");
+  return jid;
+};
+
 export const formatPhone = (phone: string, prefix = 62): string => {
   let number = phone.replace(/\D/g, "");
   if (number.startsWith("0")) {

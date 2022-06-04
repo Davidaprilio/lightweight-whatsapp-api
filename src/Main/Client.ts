@@ -13,30 +13,29 @@ import makeWASocket, {
 import Gevent from "./GlobalEvent";
 
 import MAIN_LOGGER from "../Utils/logger";
-import { formatPhoneWA, log } from "./Helper";
+import { formatPhoneWA, log, jidToNumberPhone } from "./Helper";
 // const logger = MAIN_LOGGER.child({});
 // logger.level = "debug";
+
+type ClientStatus = "disconnected" | "connecting" | "connected";
+type ClientMode = "md" | "lg"; // Multi Device or Legacy
 
 interface ClientInfo {
   id: string;
   multiDevice: boolean;
-  auth: string;
-  store: string;
-  mode: string;
+  authPath: string;
+  storePath: string;
+  mode: ClientMode;
   more?: any;
-}
-
-interface ClientStatus {
-  // Phone Info
-  os: string;
-  number: string;
-  // WA Client Info
-  sessionName: string;
-  browser: string;
-  connectedAt: string;
-  sessionPathAuth: string;
+  status: ClientStatus;
   authenticated: boolean;
   qrCode: string;
+  ppURL: string; // Profile Picture URL Whatsapp
+  pushName: string; // name Whatsapp
+  phoneNumber: string; // phone number Whatsapp
+  jid: string; // id number from Whatsapp
+  browser: string;
+  connectedAt: string;
 }
 
 interface QueueMessage {
@@ -56,19 +55,29 @@ export default class Client {
 
   constructor(client_id: string, multiDevice: boolean = true) {
     const file = multiDevice ? `${client_id}.json` : `${client_id}-legacy.json`;
+    const pathAuth = "./session/auth";
+    const pathStorage = "./session/storage/";
     this.info = {
       id: client_id,
-      auth: `./session/auth/${file}`,
-      store: `./session/storage/${file}`,
+      authPath: `${pathAuth}/${file}`,
+      storePath: `${pathStorage}/${file}`,
       multiDevice,
       mode: multiDevice ? "md" : "lg",
+      ppURL: null,
+      pushName: null,
+      phoneNumber: null,
+      jid: null,
+      browser: null,
+      connectedAt: null,
+      status: "disconnected",
+      authenticated: false,
+      qrCode: null,
     };
 
-    if (!fs.existsSync("./session/auth"))
-      fs.mkdirSync("./session/auth", { recursive: true });
+    if (!fs.existsSync(pathAuth)) fs.mkdirSync(pathAuth, { recursive: true });
 
-    if (!fs.existsSync("./session/storage"))
-      fs.mkdirSync("./session/storage", { recursive: true });
+    if (!fs.existsSync(pathStorage))
+      fs.mkdirSync(pathStorage, { recursive: true });
 
     const logger = MAIN_LOGGER.child({});
     logger.level = "silent";
@@ -76,7 +85,7 @@ export default class Client {
 
     this.setStatusDeviceDeactive();
     this.store = makeInMemoryStore({ logger });
-    this.store.readFromFile(this.info.store);
+    this.store.readFromFile(this.info.storePath);
   }
 
   /**
@@ -196,7 +205,7 @@ export default class Client {
 
     // coba mengambil auth session
     if (this.info.multiDevice) {
-      const { state, saveState } = useSingleFileAuthState(this.info.auth);
+      const { state, saveState } = useSingleFileAuthState(this.info.authPath);
       this.saveState = saveState;
       this.sock = makeWASocket({
         version,
@@ -206,7 +215,9 @@ export default class Client {
         auth: state,
       });
     } else {
-      const { state, saveState } = useSingleFileLegacyAuthState(this.info.auth);
+      const { state, saveState } = useSingleFileLegacyAuthState(
+        this.info.authPath
+      );
       this.saveState = saveState;
       this.sock = makeWALegacySocket({
         version,
@@ -223,7 +234,7 @@ export default class Client {
    * Handle Connection Update
    *
    */
-  private connectionUpdate(update: any) {
+  private async connectionUpdate(update: any) {
     const { connection, lastDisconnect } = update;
 
     if (connection === "close") {
@@ -233,6 +244,7 @@ export default class Client {
       // Reconnect jika connection close
       // tapi bukan gara-gara Logout
       if (err?.statusCode !== DisconnectReason.loggedOut) {
+        Gevent.emit("device.connecting", this.info.id);
         const msg = lastDisconnect.error.message;
         // Mode Device Mismatch (yang scan salah mode)
         if (err?.statusCode === 411) {
@@ -245,6 +257,8 @@ export default class Client {
       }
       // Handle If Logout CODE:401
       else if (err?.statusCode === DisconnectReason.loggedOut) {
+        // Gevent.emit("device.disconnect", this.info.id);
+        Gevent.emit("device.logout", this.info.id);
         log("Client Is Logout");
         this.setStatusDeviceDeactive();
         this.removeSessionPath();
@@ -254,13 +268,23 @@ export default class Client {
       log("Connection Open", update);
       if (update.qr !== undefined) {
         log("QR Code Update");
-      } else if (update?.legacy.phoneConnected === true) {
-        Gevent.emit(
-          "device.connected",
-          this.info.id,
-          update.legacy.user,
-          this.getDeviceMode()
-        );
+        this.resetStatusClient();
+        this.info.qrCode = update.qr;
+        Gevent.emit("qrcode.update", this.info.id, update.qr, this.info.mode);
+      }
+      // Client Connected Horeee !!!
+      else if (update?.legacy.phoneConnected === true) {
+        this.setStatusDeviceActive();
+        this.info.status = "connected";
+        this.info.qrCode = null;
+        this.info.pushName = update.legacy.user.name;
+        this.info.jid = update.legacy.user.id;
+        this.info.authenticated = true;
+        this.info.ppURL = await this.getProfilePicture(this.info.jid);
+        this.info.connectedAt = new Date().toDateString();
+        this.info.phoneNumber = jidToNumberPhone(this.info.jid);
+
+        Gevent.emit("device.connected", this.info.id, this.info);
       }
     }
     // log("connection update", update);
@@ -284,13 +308,13 @@ export default class Client {
       this.info.mode = "lg";
     }
     // kirim event mode diganti
-    Gevent.emit(
-      "device.changeMode",
-      this.getDeviceMode(),
-      this.info.multiDevice
-    );
+    Gevent.emit("device.changeMode", this.info.id, {
+      mode: this.getDeviceMode(),
+      isMultidevice: this.info.multiDevice,
+    });
   }
-  private getDeviceMode() {
+
+  private getDeviceMode(): string {
     return this.info.multiDevice ? "MultiDevice" : "Legacy";
   }
 
@@ -298,11 +322,11 @@ export default class Client {
    * Handle Remove Session Path
    */
   private removeSessionPath() {
-    if (fs.existsSync(this.info.auth)) {
-      fs.rmSync(this.info.auth, { recursive: true, force: true });
+    if (fs.existsSync(this.info.authPath)) {
+      fs.rmSync(this.info.authPath, { recursive: true, force: true });
     }
-    if (fs.existsSync(this.info.store)) {
-      fs.rmSync(this.info.store, { recursive: true, force: true });
+    if (fs.existsSync(this.info.storePath)) {
+      fs.rmSync(this.info.storePath, { recursive: true, force: true });
     }
   }
 
@@ -311,6 +335,14 @@ export default class Client {
   }
   private setStatusDeviceActive() {
     this.status = "connected";
+  }
+  private resetStatusClient(): void {
+    this.info.jid = null;
+    this.info.status = "disconnected";
+    this.info.qrCode = null;
+    this.info.pushName = null;
+    this.info.phoneNumber = null;
+    this.info.authenticated = null;
   }
 
   sendMessageWithTyping = async (
@@ -348,5 +380,25 @@ export default class Client {
   async isRegistWA(numberPhone: string): Promise<boolean> {
     const res = await this.sock.onWhatsApp(formatPhoneWA(numberPhone));
     return res?.exists ?? false;
+  }
+
+  async statusContact(jid: string): Promise<string> {
+    const status = await this.sock.fetchStatus(jid);
+    console.log("status: " + status);
+    return status;
+  }
+
+  async getProfilePicture(
+    jid: string,
+    highResolution = false
+  ): Promise<string> {
+    if (highResolution) {
+      // for high res picture
+      this.info.ppURL = await this.sock.profilePictureUrl(jid, "image");
+    } else {
+      // for low res picture
+      this.info.ppURL = await this.sock.profilePictureUrl(jid);
+    }
+    return this.info.ppURL;
   }
 }
