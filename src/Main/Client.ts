@@ -10,8 +10,7 @@ import makeWASocket, {
   useSingleFileLegacyAuthState,
   useSingleFileAuthState,
 } from "@adiwajshing/baileys";
-import EventEmitter from "events";
-class ClientEvent extends EventEmitter {}
+import Gevent from "./GlobalEvent";
 
 import MAIN_LOGGER from "../Utils/logger";
 import { formatPhoneWA, log } from "./Helper";
@@ -48,7 +47,6 @@ interface QueueMessage {
 export default class Client {
   info: ClientInfo;
   sock: any; // Socket dari makeWALegacySocket | makeWASocket
-  ev: any;
 
   private queueMessage: [];
   private status: string;
@@ -71,8 +69,6 @@ export default class Client {
 
     if (!fs.existsSync("./session/storage"))
       fs.mkdirSync("./session/storage", { recursive: true });
-
-    this.ev = new ClientEvent();
 
     const logger = MAIN_LOGGER.child({});
     logger.level = "silent";
@@ -259,7 +255,7 @@ export default class Client {
       if (update.qr !== undefined) {
         log("QR Code Update");
       } else if (update?.legacy.phoneConnected === true) {
-        this.ev.emit(
+        Gevent.emit(
           "device.connected",
           this.info.id,
           update.legacy.user,
@@ -288,7 +284,7 @@ export default class Client {
       this.info.mode = "lg";
     }
     // kirim event mode diganti
-    this.ev.emit(
+    Gevent.emit(
       "device.changeMode",
       this.getDeviceMode(),
       this.info.multiDevice
