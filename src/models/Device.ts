@@ -1,16 +1,6 @@
 import { Schema, model, connect } from "mongoose";
 
-interface IDevice {
-  label: string;
-  cid: string;
-  auth: boolean;
-  qrCode: string;
-  mode: string;
-  lastConnected: Date;
-  avatar?: string;
-}
-
-const deviceSchema = new Schema<IDevice>({
+const deviceSchema = new Schema({
   label: {
     type: String,
     required: true,
@@ -24,10 +14,10 @@ const deviceSchema = new Schema<IDevice>({
     required: true,
     default: false,
   },
-  qrCode: {
+  status: {
     type: String,
-    required: false,
-    default: null,
+    required: true,
+    default: "disconnected",
   },
   mode: {
     type: String,
@@ -38,8 +28,23 @@ const deviceSchema = new Schema<IDevice>({
     type: Date,
     required: false,
   },
-  avatar: String,
+  ppURL: {
+    type: String,
+    required: false,
+  },
+  pushName: {
+    type: String,
+    required: false,
+  },
+  phoneNumber: {
+    type: String,
+    required: false,
+  },
+  browserClient: {
+    type: String,
+    required: false,
+  },
 });
 
-const Device = model<IDevice>("Device", deviceSchema);
+const Device = model("Device", deviceSchema);
 export default Device;
