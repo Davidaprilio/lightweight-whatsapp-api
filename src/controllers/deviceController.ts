@@ -5,6 +5,7 @@ import CreateMessage from "../Main/CreateMessage";
 import clientSession from "../Main/SessionClient";
 import { check } from "express-validator";
 import { validate } from "../Main/Validator";
+import Gevent from "../Main/GlobalEvent";
 
 exports.start = (req: Request, res: Response) => {
   validate([check("multidevice").not().isEmpty()]);
@@ -75,27 +76,29 @@ export const handleStart = async (cid: string, mode: boolean) => {
   return;
 };
 
-// client.ev.on(
-//   "device.changeMode",
-//   async (modeText: string, multiDevice: boolean) => {
-//     await Device.findOneAndUpdate(
-//       { cid: client.info.id },
-//       { mode: multiDevice }
-//     );
-//     console.log("ganti Mode dengan handle event: ", modeText);
-//   }
-// );
+Gevent.on("device.changeMode", async (cid: string, data: any) => {
+  await Device.findOneAndUpdate(
+    { cid },
+    {
+      mode: data.mode,
+    }
+  );
+  console.log("ganti Mode dengan handle event: ", data.mode);
+});
 
-// client.ev.on(
-//   "device.connected",
-//   async (clientId: string, clientInfo: object) => {
-//     await Device.findOneAndUpdate(
-//       { cid: client.info.id },
-//       {
-//         auth: true,
-//         // lastConnected:
-//       }
-//     );
-//     console.log("Event: Device Connect", client.info.id);
-//   }
-// );
+Gevent.on("device.connection.update", async (cid: string, clientInfo: any) => {
+  const data = {
+    auth: clientInfo.authenticated,
+    status: clientInfo.status,
+    mode: clientInfo.mode == "md" ? "MultiDevice" : "Legacy",
+    browserClient: clientInfo.browser,
+  };
+  if (clientInfo.status === "connected") {
+    data["ppURL"] = clientInfo.ppURL;
+    data["pushName"] = clientInfo.pushName;
+    data["phoneNumber"] = clientInfo.phoneNumber;
+    data["lastConnected"] = new Date();
+  }
+  console.log("Event: Device Connection Save To DB", clientInfo.status);
+  await Device.findOneAndUpdate({ cid }, data);
+});

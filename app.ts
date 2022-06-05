@@ -43,10 +43,10 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-Device.find({ auth: true })
+Device.find({ auth: true, status: "connected" })
   .then((devices) => {
     devices.forEach((device) => {
-      const mode = device.mode != "Legacy";
+      const mode = device.mode == "MultiDevice";
       console.log("Start " + device.cid);
 
       handleStart(device.cid, mode);
