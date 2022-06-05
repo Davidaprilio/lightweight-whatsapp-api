@@ -17,7 +17,12 @@ import { formatPhoneWA, log, jidToNumberPhone } from "./Helper";
 // const logger = MAIN_LOGGER.child({});
 // logger.level = "debug";
 
-type ClientStatus = "disconnected" | "connecting" | "connected";
+type ClientStatus =
+  | "stop"
+  | "disconnected"
+  | "connecting"
+  | "scan QR"
+  | "connected";
 type ClientMode = "md" | "lg"; // Multi Device or Legacy
 
 interface ClientInfo {
@@ -52,8 +57,13 @@ export default class Client {
   private saveState: any;
   private store: any;
   private logger: any;
+  private isStopedByUser: boolean = false;
 
-  constructor(client_id: string, multiDevice: boolean = true) {
+  constructor(
+    client_id: string,
+    multiDevice: boolean = true,
+    browser: string = "Chrome"
+  ) {
     const file = multiDevice ? `${client_id}.json` : `${client_id}-legacy.json`;
     const pathAuth = "./session/auth";
     const pathStorage = "./session/storage/";
@@ -67,7 +77,7 @@ export default class Client {
       pushName: null,
       phoneNumber: null,
       jid: null,
-      browser: null,
+      browser, // Chrome|Firefox|Safari|Custom name
       connectedAt: null,
       status: "disconnected",
       authenticated: false,
@@ -91,8 +101,13 @@ export default class Client {
   /**
    * Starting Socket Session Client
    */
-  startSock = async () => {
+  startSock = async (skipStopState = false) => {
+    if (skipStopState) {
+      this.isStopedByUser = false;
+    }
+
     if (this.status == "active") {
+      console.log(`Client ${this.info.id} already connected`);
       return "Device alredy connected";
     }
 
@@ -166,13 +181,23 @@ export default class Client {
     return this.sock;
   };
 
+  async stopSock() {
+    this.isStopedByUser = true; // Set StopByUser true agar tidak di Reconnect oleh connectionUpdate()
+    await this.sock.ws.terminate();
+    // await this.sock.ws.close();
+    this.setStatusDeviceDeactive();
+  }
+
   /**
    * Loggout Socket Session Client
    */
-  logout() {
+  async logout() {
     // this.sock.ws.close();
-    this.sock.logout();
+    await this.sock.logout();
+    this.info.authenticated = false;
+    this.info.status = "disconnected";
     this.removeSessionPath();
+    return true;
   }
 
   /**
@@ -189,7 +214,7 @@ export default class Client {
    */
   async createSock(
     host: string = "DevDav",
-    browser: string = "Chrome",
+    browser: string = this.info.browser,
     browserVerison: string = "22.21"
   ) {
     // Cek Latest version dari Baileys
@@ -235,16 +260,20 @@ export default class Client {
    *
    */
   private async connectionUpdate(update: any) {
+    // Jika status device sudah di-Stop, maka tidak perlu di lagi biarkan mati
     const { connection, lastDisconnect } = update;
 
-    if (connection === "close") {
+    if (this.isStopedByUser) {
+      log(`Device ${this.info.id} Stoped by user (Not Reconnect)`);
+      this.info.status = "stop";
+    }
+    // Reconnect jika connection close
+    else if (connection === "close") {
+      this.info.status = "connecting";
       const err = (lastDisconnect.error as Boom)?.output;
       log("connection Debug:", err?.payload ?? err);
-
-      // Reconnect jika connection close
       // tapi bukan gara-gara Logout
       if (err?.statusCode !== DisconnectReason.loggedOut) {
-        Gevent.emit("device.connecting", this.info.id);
         const msg = lastDisconnect.error.message;
         // Mode Device Mismatch (yang scan salah mode)
         if (err?.statusCode === 411) {
@@ -257,8 +286,6 @@ export default class Client {
       }
       // Handle If Logout CODE:401
       else if (err?.statusCode === DisconnectReason.loggedOut) {
-        // Gevent.emit("device.disconnect", this.info.id);
-        Gevent.emit("device.logout", this.info.id);
         log("Client Is Logout");
         this.setStatusDeviceDeactive();
         this.removeSessionPath();
@@ -266,16 +293,17 @@ export default class Client {
     } // End Connection Close
     else {
       log("Connection Open", update);
+      // QR Code Baru
       if (update.qr !== undefined) {
         log("QR Code Update");
         this.resetStatusClient();
+        this.info.authenticated = false;
         this.info.qrCode = update.qr;
-        Gevent.emit("qrcode.update", this.info.id, update.qr, this.info.mode);
+        this.info.status = "scan QR";
       }
       // Client Connected Horeee !!!
-      else if (update?.legacy.phoneConnected === true) {
+      else if (update?.legacy?.phoneConnected === true) {
         this.setStatusDeviceActive();
-        this.info.status = "connected";
         this.info.qrCode = null;
         this.info.pushName = update.legacy.user.name;
         this.info.jid = update.legacy.user.id;
@@ -283,9 +311,25 @@ export default class Client {
         this.info.ppURL = await this.getProfilePicture(this.info.jid);
         this.info.connectedAt = new Date().toDateString();
         this.info.phoneNumber = jidToNumberPhone(this.info.jid);
-
-        Gevent.emit("device.connected", this.info.id, this.info);
+      } else {
+        log("Open {else}");
+        this.info.status = "connecting";
       }
+    }
+
+    // emit Event device Connection Update
+    if (this.info.status === "scan QR") {
+      Gevent.emit("device.qrcode.update", this.info.id, {
+        qrCode: update.qr,
+        mode: this.info.mode,
+      });
+    } else {
+      Gevent.emit("device.connection.update", this.info.id, {
+        status: this.info.status,
+        mode: this.info.mode,
+        authenticated: this.info.authenticated,
+        info: this.info.status === "connected" ? this.info : null,
+      });
     }
     // log("connection update", update);
   }
@@ -314,7 +358,7 @@ export default class Client {
     });
   }
 
-  private getDeviceMode(): string {
+  private getDeviceMode() {
     return this.info.multiDevice ? "MultiDevice" : "Legacy";
   }
 
@@ -332,9 +376,11 @@ export default class Client {
 
   private setStatusDeviceDeactive() {
     this.status = "not connected";
+    this.info.status = "disconnected";
   }
   private setStatusDeviceActive() {
     this.status = "connected";
+    this.info.status = "connected";
   }
   private resetStatusClient(): void {
     this.info.jid = null;
@@ -342,7 +388,6 @@ export default class Client {
     this.info.qrCode = null;
     this.info.pushName = null;
     this.info.phoneNumber = null;
-    this.info.authenticated = null;
   }
 
   sendMessageWithTyping = async (
