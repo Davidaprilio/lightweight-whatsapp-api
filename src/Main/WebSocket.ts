@@ -1,5 +1,6 @@
 import clientSession from "./SessionClient";
 import Gevent from "./GlobalEvent";
+import Device from "../models/Device";
 const deviceController = require("../controllers/deviceController");
 const socketIO = require("socket.io");
 
@@ -23,16 +24,42 @@ module.exports = function (httpServer) {
       next();
     });
 
-    socket.on("device-start", (mode) => {
+    socket.on("device-start", async (mode) => {
       console.log("Start", socket.cid);
-      if (clientSession[socket.cid] === undefined) {
-        deviceController.handleStart(socket.cid, mode);
+      const client = clientSession[socket.cid];
+      if (client === undefined) {
+        try {
+          var device = await Device.findOne({ cid: socket.cid });
+        } catch (err) {
+          console.log("Device start error", err);
+        }
+        if (device) {
+          deviceController.handleStart(
+            socket.cid,
+            device.mode === "MultiDevice"
+          );
+        } else {
+          console.log("start Device not found");
+          socket.emit("device.start.failed", "Device not found");
+        }
+      } else if (client.info.status != "connected") {
+        console.log("Start Client", socket.cid);
+        client.startSock(true);
+      } else {
+        console.log("Device already connected");
+        socket.emit("device.start.failed", "Device already connected");
       }
     });
+
     socket.on("device-stop", () => {
-      console.log("Start", socket.cid);
-      if (clientSession[socket.cid] === undefined) {
-        clientSession[socket.cid].logout();
+      if (clientSession[socket.cid] !== undefined) {
+        clientSession[socket.cid].stopSock();
+      }
+    });
+
+    socket.on("device-logout", async () => {
+      if (clientSession[socket.cid] !== undefined) {
+        await clientSession[socket.cid].logout();
         delete clientSession[socket.cid];
       }
     });
@@ -47,15 +74,19 @@ module.exports = function (httpServer) {
     // Handle Join to Device Room
     socket.on("listen-device", (cid) => {
       socket.join(`device:${cid}`);
-      socket.to(`device:david14-test`).emit("listened.device");
+      socket.emit("listened.device");
     });
 
     socket.on("device-info", () => {
       console.log("info device:", socket.cid);
-      const client = clientSession[socket.cid]?.info;
+      const client = clientSession[socket.cid];
       if (client) {
-        console.log("info device send:", client.id);
-        socket.emit("device.connected", client, true);
+        socket.emit("device.info", client.info);
+      } else {
+        socket.emit("device.info", {
+          status: "disconnected",
+          message: "Device Not Activated",
+        });
       }
     });
 
@@ -64,24 +95,18 @@ module.exports = function (httpServer) {
       console.log(io.sockets.adapter.rooms);
     });
 
-    Gevent.on("device.connected", (cid, user, mode) => {
-      socket.to(`device:${cid}`).emit("device.connected", user, mode);
-    });
-    Gevent.on("device.connecting", (cid, user) => {
-      socket.to(`device:${cid}`).emit("device.connected");
-    });
-    Gevent.on("device.disconnected", (cid) => {
-      socket.to(`device:${cid}`).emit("device.connected");
+    Gevent.on("device.connection.update", (cid, data) => {
+      socket.emit("device.connection.update", data);
+      //   // .to(`device:${cid}`)
     });
 
     /**
      * QRcode Event
      */
-    Gevent.on("qrcode.update", (cid, data) => {
+    Gevent.on("device.qrcode.update", (cid, data) => {
       socket.to(`device:${cid}`).emit("qrcode.update", data);
     });
-
-    Gevent.on("qrcode.stop", (cid, data) => {
+    Gevent.on("device.qrcode.stop", (cid, data) => {
       socket.to(`device:${cid}`).emit("qrcode.stop", data);
     });
   });

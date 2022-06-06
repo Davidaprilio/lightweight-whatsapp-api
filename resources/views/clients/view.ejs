@@ -28,22 +28,26 @@
   </div>
 </div>
 
-<div class="row justify-content-center container">
+<div class="row justify-content-center container-xxl">
   <div class="col-6 col-md-5 col-lg-4">
     <div class="border rounded bg-white shadow-sm p-2 text-center">
       <h5 class="mb-0"><%-device.label%></h5>
-      <small
-        >status:
-        <span id="status-device"
-          ><%= device.auth ? 'Connected' : 'Disconnected' %></span
-        ></small
-      >
+      <small>
+        status:
+        <span id="status-device" data-status="<%= device.status %>">
+          <%= device.status %>
+        </span>
+      </small>
       <div class="mt-3" id="container-qrcode">
         <img
-          src="https://via.placeholder.com/300"
-          alt="image QR"
+          src="<%=device.auth ? device.ppURL : baseURL+'/loading.gif' %> "
+          alt="Avatar"
+          width="300"
+          height="300"
+          onerror="this.src='https://via.placeholder.com/300'"
           class="img-fluid rounded"
         />
+        <div id="qrCode" class="img-fluid"></div>
       </div>
     </div>
   </div>
@@ -55,7 +59,19 @@
             class="list-group-item d-flex justify-content-between align-items-center"
           >
             Client ID
-            <span class="CID badge bg-primary rounded-pill">-</span>
+            <span
+              class="CID badge bg-primary rounded-pill"
+              data-cid="<%=device.cid%>"
+              ><%=device.cid%></span
+            >
+          </li>
+          <li
+            class="list-group-item d-flex justify-content-between align-items-center"
+          >
+            Mode
+            <span class="MODE badge bg-primary rounded-pill"
+              ><%=device.mode%>
+            </span>
           </li>
           <li
             class="list-group-item d-flex justify-content-between align-items-center"
@@ -69,12 +85,6 @@
             Phone Number
             <span class="PHONE-NUMBER badge bg-primary rounded-pill">-</span>
           </li>
-          <li
-            class="list-group-item d-flex justify-content-between align-items-center"
-          >
-            Mode
-            <span class="MODE badge bg-primary rounded-pill">-</span>
-          </li>
         </ul>
       </div>
       <div class="card-footer p-0 text-center d-flex">
@@ -84,14 +94,17 @@
         >
           Start
         </div>
-        <div class="btn btn-link text-decoration-none flex-grow-1 rounded-0">
-          Restart
-        </div>
         <div
           id="stop-device"
-          class="btn btn-link text-decoration-none flex-grow-1 rounded-0 border-start"
+          class="btn btn-link text-decoration-none flex-grow-1 rounded-0"
         >
           Stop
+        </div>
+        <div
+          id="logout-device"
+          class="btn btn-link text-decoration-none flex-grow-1 rounded-0 border-start"
+        >
+          Logout
         </div>
       </div>
     </div>
@@ -115,6 +128,10 @@
   integrity="sha384-7EyYLQZgWBi67fBtVxw60/OWl1kjsfrPFcaU0pp0nAh+i8FD068QogUvg85Ewy1k"
   crossorigin="anonymous"
 ></script>
+<script
+  type="text/javascript"
+  src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"
+></script>
 <script>
   const socket = io("<%=baseURL%>", {
     autoConnect: false,
@@ -122,10 +139,13 @@
 
   const btnStartDevice = document.getElementById("start-device");
   const btnStopDevice = document.getElementById("stop-device");
+  const btnLogoutDevice = document.getElementById("logout-device");
   const statusDevice = document.getElementById("status-device");
   const detailContain = document.getElementById("detail-device");
   const qrcodeContain = document.getElementById("container-qrcode");
-  const qrImg = document.querySelector("#container-qrcode img");
+  const avatarWA = document.querySelector("#container-qrcode img");
+  const qrcodeCanvas = document.getElementById("qrCode");
+  const loadingGIF = "<%=baseURL%>/loading.gif";
   const detail = {
     cid: document.querySelector(".CID"),
     pushName: document.querySelector(".PUSH-NAME"),
@@ -133,18 +153,143 @@
     mode: document.querySelector(".MODE"),
   };
 
+  function setColorTextStatus() {
+    statusDevice.setAttribute("class", "");
+    const status = statusDevice.dataset.status;
+    if (status === "connected") {
+      statusDevice.classList.add("text-success");
+    } else if (status === "connecting") {
+      statusDevice.classList.add("text-primary");
+    } else if ((status === "disconnected") | (status === "stop")) {
+      statusDevice.classList.add("text-danger");
+    } else {
+      statusDevice.classList.add("text-dark");
+    }
+  }
+  setColorTextStatus();
+
+  function setDeviceStatus(status, displayText = false) {
+    statusDevice.dataset.status = status;
+    statusDevice.innerText = displayText ? displayText : status;
+    setColorTextStatus();
+  }
+
+  function modeFullText(mode) {
+    return mode == "md" ? "MultiDevice" : "Legacy";
+  }
+
+  function showAvatar(url) {
+    avatarWA.setAttribute("src", url);
+    qrcodeCanvas.style.display = "none";
+    avatarWA.style.display = "block";
+  }
+
+  function printQRCode(data) {
+    showAvatar(loadingGIF);
+    const qrCode = new QRCodeStyling({
+      data,
+      width: 300,
+      height: 300,
+      qrOptions: {
+        typeNumber: "0",
+        mode: "Byte",
+        errorCorrectionLevel: "M",
+      },
+      imageOptions: {
+        hideBackgroundDots: true,
+        imageSize: 0.8,
+        margin: 8,
+      },
+      dotsOptions: {
+        type: "square",
+        color: "#191c1f",
+      },
+      backgroundOptions: {
+        color: "#ffffff",
+      },
+      image:
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAAA/1BMVEUAAAAxeMYwd8Mwd8cwd78xeMUxd8UwcL8weMUwd8UweMQweMQweMYweMcxd8Yyd8YwdcQwdsIwcM8yd8YyeMcxecYwdsYweccyeMQweMYwd8Qxd8Uwd8YwesUweMYxeMQwd8UwdsYyeMUxecUwe8UyeMcwecQyd8UzesUwd8Uwdcowd8gzeccxeMZkmtTL3fHy9/v///8+gMrl7viYu+KLs99lmdRKic1xotilxOalw+ZLic2lw+fm7vexzOqyzOmYvOLM3fB+qtx+q9uYu+PY5fXY5vTZ5vS+1e1yodhLiM2yzemyzOpXktC/1O5YkdBXkdFKiM1YktC/1ex+qtuH3baaAAAALXRSTlMA30AgIL/vEL+AYJCQn++vMFAQj3/PcF+QoJDPr2/foM9Qn89Pn3Cvb7Awr18XickkAAAEa0lEQVR4XsWbh3LjOAxAQSqS3OKS2Fnb6dnbvQo1t/SerVfL/3/L7SS5gW2KlmRB1PsBvAFAsFiGtbCO9/vvbCHwGdGzW/192QYjWLV+z8FYHLt/vAFF4sq+wAR6JxIKQr5zMBXOyTGw0+46mAFxwlsLaWNmbFlSeEK84Q9vXmHDxly08vWC28XcdN0c2RfIgJCwHu42MrG9XvUFsiHW6IRfHGSkuQMZ2UZmutnKbyM7LTdD+XtIGG8Eaj/zBhS/PAOKb96A4pdp4AoslF7SWvgeC6YFK+miFiMbww9ogDegZcNBAzT1jSjQCMJl2YD420CiMSTDBOAvQhcNUgWFDTSKuhJaaBQblqihYaQ6AkpNQQ2NI5UElJkCiVhuCmzkJPo8uX4aBeE3gtGTfzmZRpoU6GZAmAVc5MujH6o8XU5Rgd71DtkEpr5W9HrFOBRMAhcUPo1AE17pII/AfRBmEaA2POQReAzDjAKb8ILDIEDxMwg0XRoCuQV+CzMKUA0OWQRG6wjUnwV2OQQe4tyukgQETaFcAmoCgpuH2UtlvPFdoBVAixbhPN4SVyEReEu8DKBFqbMI5zm90QnUAGCIicwLjDCOswWBW1zm4oYElpvA5hDwddUmBbIi8C0AOLkESJHwMDVNgDZyCITz/IXpsUDyC/yN6fkO3vMLjDE9OzBE9h4IZpiaOrRYBD6E84zSG2yCjfxzIAzuMSUV2GUR8MIlPqVMggDBIhAF6u43SyeALAI4DlX8z5gMg4CaArK9j4wI0IFAVXicGRLA21CjMDEkgF9DnYJnRIByoPKIWhiWIfGgPZn6UcFzgA4+Gp40Bm95RjFxqkuCrxvFAyYBUrgjgeRN+keO7VgtROxUih0IdZYDiaoQ146f4g8kHW4B/YqIUEWCxS2gHwsTVPmJ4Viu5WKUfEGnuymjABksntQ+oEKF52qmN1hYDkH81azGLaA/p8RdCwCsIgX+TBCw4BuCQeBUVwOdAN1NAYYMAv51hHFMQ607PZNJDoFwdI8x/DovcKd5pHIdnveB6z8UgUk4z7nuqXTA9UDhLx6Co6X70qnuoVIyvpD44+lLIr78e7m0JwYxi/AVh0mALFM9FAr4nyqfgJ7RTFcBgLYJgUnsFHrFLl7gLGYjImThAl8TfrezCxY4i38nJmROgd9X95+X/CmJnU+ATqEqwW2EugQQMvd27J1/jIt+7qX8lsbG/ETe5Pyfu6vgOfLVx5vxwww17MEyFhrFAoUqGqRa9kcsW6V/xhPLEA1RB6KMIgjQYTloAMcCLTU0wA6sYGh4BarYWDB7sBp31+wEULFEofEtgPIMKL55A4pfjgHFL9OgZ0Fq3Bays7cFWaga2oD07DjIiFODzFjCSPsZ2RjqW2X/1WttXIZerG5BHqyfMRcVC/JSEznCU/aNKlB4LmSlpPCENciUBqfaBnY6Aydl9E0JBSEHR5jAQUNuQZFYnUZFkwnnqFGzwAhtud/Yqxwd4DMHB5XNxn5nvdj/AZOb9EGg8lN7AAAAAElFTkSuQmCC",
+      dotsOptionsHelper: {
+        colorType: {
+          single: true,
+          gradient: false,
+        },
+        gradient: {
+          linear: true,
+          radial: false,
+          color1: "#6a1a4c",
+          color2: "#6a1a4c",
+          rotation: "0",
+        },
+      },
+      cornersSquareOptions: {
+        type: "square",
+        color: "#000000",
+      },
+      cornersSquareOptionsHelper: {
+        colorType: {
+          single: true,
+          gradient: false,
+        },
+        gradient: {
+          linear: true,
+          radial: false,
+          color1: "#000000",
+          color2: "#000000",
+          rotation: "0",
+        },
+      },
+      cornersDotOptions: {
+        type: "square",
+        color: "#191c1f",
+      },
+      cornersDotOptionsHelper: {
+        colorType: {
+          single: true,
+          gradient: false,
+        },
+        gradient: {
+          linear: true,
+          radial: false,
+          color1: "#000000",
+          color2: "#000000",
+          rotation: "0",
+        },
+      },
+      backgroundOptionsHelper: {
+        colorType: {
+          single: true,
+          gradient: false,
+        },
+        gradient: {
+          linear: true,
+          radial: false,
+          color1: "#ffffff",
+          color2: "#ffffff",
+          rotation: "0",
+        },
+      },
+    });
+    qrcodeCanvas.innerHTML = "";
+    qrCode.append(qrcodeCanvas);
+    qrcodeCanvas.querySelector("canvas").classList.add("img-fluid");
+    avatarWA.style.display = "none";
+    qrcodeCanvas.style.display = "block";
+  }
+
   btnStartDevice.addEventListener("click", () => {
     socket.emit("device-start");
   });
 
   btnStopDevice.addEventListener("click", () => {
-    const isMultidevice = true;
-    socket.emit("device-stop", isMultidevice);
+    socket.emit("device-stop");
   });
 
-  socket.auth = {
-    cid: "<%=device.cid%>",
-  };
+  btnLogoutDevice.addEventListener("click", () => {
+    socket.emit("device-logout");
+  });
+
+  socket.auth = { cid: detail.cid.dataset.cid };
   socket.connect();
 
   socket.on("connect", () => {
@@ -152,31 +297,67 @@
     socket.emit("listen-device", socket.auth.cid);
   });
   socket.on("disconnect", () => {
-    console.log("disconnected");
+    console.log("disconnect");
+    setDeviceStatus("disconnected", "Disconnected from server");
   });
+
   socket.on("listened.device", () => {
     console.log("device listened");
     socket.emit("device-info");
   });
-
-  socket.on("joined", (data) => {
-    console.log("joined", data);
+  socket.on("device.info", (data) => {
+    console.log("device info", data);
+    if (data.status === "scan QR") {
+      setDeviceStatus("Scan QRcode");
+      printQRCode(data.qrCode);
+    } else {
+      setDeviceStatus(data.status);
+      showAvatar(data.ppURL ?? "https://via.placeholder.com/300");
+    }
+    if (data?.message !== "Device Not Activated") {
+      detail.cid.textContent = data.id;
+      detail.pushName.textContent = data.pushName;
+      detail.phoneNumber.textContent = data.phoneNumber;
+      detail.mode.textContent = modeFullText(data.mode);
+    }
   });
 
-  socket.on("device.connected", (data, mode) => {
-    statusDevice.innerText = "Connected";
-    statusDevice.classList.add("text-success");
-    statusDevice.classList.remove("text-danger");
-    detail.pushName.innerText = data.pushName;
-    detail.phoneNumber.innerText = data.phoneNumber;
-    detail.cid.innerText = data.id;
-    qrImg.setAttribute("src", data.ppURL);
-    detail.mode.innerText = data.mode == "md" ? "Multi Device" : "Legacy";
-  });
+  socket.on(
+    "device.connection.update",
+    ({ status, mode, isAuthenticated, info }) => {
+      console.log(`Device:`, status);
+      detail.mode.innerText = modeFullText(mode);
+      setDeviceStatus(status);
+      if (status === "connected") {
+        console.log(info);
+        detail.pushName.innerText = info.pushName;
+        detail.phoneNumber.innerText = info.phoneNumber;
+        detail.cid.innerText = info.id;
+        showAvatar(info.ppURL);
+      } else if (isAuthenticated == false && status === "disconnected") {
+        detail.pushName.innerText = "-";
+        detail.phoneNumber.innerText = "-";
+        showAvatar("https://via.placeholder.com/300");
+      } else if (
+        statusDevice.dataset.status === "Scan QRcode" &&
+        (status === "disconnected" || status === "stop")
+      ) {
+        detail.pushName.innerText = "-";
+        detail.phoneNumber.innerText = "-";
+        showAvatar("https://via.placeholder.com/300");
+      }
+    }
+  );
+
   socket.on("qrcode.update", (data) => {
-    console.log("QRcode:", data);
+    console.log("QRcode Received");
+    setDeviceStatus("Scan QRcode");
+    printQRCode(data.qrCode);
+    detail.mode.innerText = modeFullText(data.mode);
   });
+
   socket.on("qrcode.stop", () => {
+    setDeviceStatus("disconnected");
     console.log("QRcode STOP");
   });
 </script>
