@@ -9,6 +9,7 @@ import makeWASocket, {
   makeWALegacySocket,
   useSingleFileLegacyAuthState,
   useSingleFileAuthState,
+  ConnectionState,
 } from "@adiwajshing/baileys";
 import Gevent from "./GlobalEvent";
 
@@ -66,7 +67,7 @@ export default class Client {
   ) {
     const file = multiDevice ? `${client_id}.json` : `${client_id}-legacy.json`;
     const pathAuth = "./session/auth";
-    const pathStorage = "./session/storage/";
+    const pathStorage = "./session/storage";
     this.info = {
       id: client_id,
       authPath: `${pathAuth}/${file}`,
@@ -126,7 +127,11 @@ export default class Client {
       if (m.type === "notify") {
         if (!msg.key.fromMe) {
           log("replying to", msg.key.remoteJid);
-          await this.sock!.chatRead(msg.key, 1);
+          try {
+            await this.sock.chatRead(msg.key, 1);
+          } catch (error) {
+            console.log("error", error);
+          }
         }
 
         const textMsg = msg?.message?.conversation;
@@ -232,13 +237,17 @@ export default class Client {
     if (this.info.multiDevice) {
       const { state, saveState } = useSingleFileAuthState(this.info.authPath);
       this.saveState = saveState;
-      this.sock = makeWASocket({
-        version,
-        logger: this.logger,
-        browser: [host, browser, browserVerison],
-        printQRInTerminal: true,
-        auth: state,
-      });
+      try {
+        this.sock = makeWASocket({
+          version,
+          logger: this.logger,
+          browser: [host, browser, browserVerison],
+          printQRInTerminal: true,
+          auth: state,
+        });
+      } catch (error) {
+        console.log("Socket Error:", error);
+      }
     } else {
       const { state, saveState } = useSingleFileLegacyAuthState(
         this.info.authPath
@@ -259,10 +268,11 @@ export default class Client {
    * Handle Connection Update
    *
    */
-  private async connectionUpdate(update: any) {
-    // Jika status device sudah di-Stop, maka tidak perlu di lagi biarkan mati
-    const { connection, lastDisconnect } = update;
+  private async connectionUpdate(update: ConnectionState) {
+    const { connection, lastDisconnect, qr } = update;
+    // log("connection update: ", connection, lastDisconnect, update);
 
+    // Jika status device sudah di-Stop, maka tidak perlu di reconnect lagi biarkan mati
     if (this.isStopedByUser) {
       log(`Device ${this.info.id} Stoped by user (Not Reconnect)`);
       this.info.status = "stop";
@@ -271,9 +281,28 @@ export default class Client {
     else if (connection === "close") {
       this.info.status = "connecting";
       const err = (lastDisconnect.error as Boom)?.output;
-      log("connection Debug:", err?.payload ?? err);
+      log("Connection Close:", err?.payload ?? err);
+      console.log({
+        errPayload: err,
+      });
+      // Connection Gone
+      if (
+        err?.statusCode === 410 ||
+        err?.payload.message === "Stream Errored"
+      ) {
+        console.log("Stream Errored", err.payload);
+        try {
+          await this.stopSock();
+        } catch (error) {
+          console.log("Stoped sock", error);
+        }
+        setTimeout(() => {
+          this.startSock(true);
+        }, 10_000);
+        return false;
+      }
       // tapi bukan gara-gara Logout
-      if (err?.statusCode !== DisconnectReason.loggedOut) {
+      else if (err?.statusCode !== DisconnectReason.loggedOut) {
         const msg = lastDisconnect.error.message;
         // Mode Device Mismatch (yang scan salah mode)
         if (err?.statusCode === 411) {
@@ -287,32 +316,44 @@ export default class Client {
       // Handle If Logout CODE:401
       else if (err?.statusCode === DisconnectReason.loggedOut) {
         log("Client Is Logout");
+        this.info.authenticated = false;
+        this.info.status = "disconnected";
         this.setStatusDeviceDeactive();
         this.removeSessionPath();
       }
-    } // End Connection Close
-    else {
+    }
+    // Client Connected Horeee !!!
+    else if (connection === "open") {
       log("Connection Open", update);
-      // QR Code Baru
-      if (update.qr !== undefined) {
-        log("QR Code Update");
-        this.resetStatusClient();
-        this.info.authenticated = false;
-        this.info.qrCode = update.qr;
-        this.info.status = "scan QR";
-      }
-      // Client Connected Horeee !!!
-      else if (update?.legacy?.phoneConnected === true) {
-        this.setStatusDeviceActive();
-        this.info.qrCode = null;
+      this.setStatusDeviceActive();
+      this.info.qrCode = null;
+      this.info.authenticated = true;
+      this.info.connectedAt = new Date().toDateString();
+      // Legacy
+      if (update?.legacy?.phoneConnected === true) {
         this.info.pushName = update.legacy.user.name;
         this.info.jid = update.legacy.user.id;
-        this.info.authenticated = true;
         this.info.ppURL = await this.getProfilePicture(this.info.jid);
-        this.info.connectedAt = new Date().toDateString();
         this.info.phoneNumber = jidToNumberPhone(this.info.jid);
-      } else {
-        log("Open {else}");
+      }
+      // Multi Device
+      else {
+        this.info.pushName = "update.user.name";
+        this.info.jid = "update.user.id";
+      }
+    }
+    // New QR Code
+    else if (qr !== undefined) {
+      log("QR Code Update");
+      this.resetStatusClient();
+      this.info.authenticated = false;
+      this.info.qrCode = update.qr;
+      this.info.status = "scan QR";
+    }
+    // Status Tidak dikenali
+    else {
+      log("Open {else}", update);
+      if (connection == "connecting") {
         this.info.status = "connecting";
       }
     }
@@ -323,7 +364,16 @@ export default class Client {
         qrCode: update.qr,
         mode: this.info.mode,
       });
-    } else {
+    }
+    // only connection update will be emit
+    else if (["open", "connecting", "close"].includes(connection)) {
+      // check current connection is equal old connection, if equal not emit
+      if (connection === this.info.status) {
+        console.log("Emit closed but it's still the same connection");
+        return false;
+      } else {
+        console.log("Emit connection.update");
+      }
       Gevent.emit("device.connection.update", this.info.id, {
         status: this.info.status,
         mode: this.info.mode,
@@ -331,7 +381,7 @@ export default class Client {
         info: this.info.status === "connected" ? this.info : null,
       });
     }
-    // log("connection update", update);
+    // log("connection update: END");
   }
 
   /**
@@ -423,7 +473,13 @@ export default class Client {
    * Checking Phone Number is Registration on Whatsapp
    */
   async isRegistWA(numberPhone: string): Promise<boolean> {
-    const res = await this.sock.onWhatsApp(formatPhoneWA(numberPhone));
+    const phone = formatPhoneWA(numberPhone);
+    let res = await this.sock.onWhatsApp(phone);
+    // check type data let res
+    if (Array.isArray(res)) {
+      res = res[0];
+    }
+    console.log(phone, res?.exists);
     return res?.exists ?? false;
   }
 
