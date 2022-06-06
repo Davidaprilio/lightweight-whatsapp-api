@@ -123,6 +123,8 @@ exports.buttonTemplate = async (req: Request, res: Response) => {
         "missing property. there must be at least one url, link, or button",
     });
   }
+  console.log(req.body.phone, Msg.print());
+
   const sendMsg = await Msg.send(req.body.phone);
   return res
     .status(200)
@@ -195,9 +197,9 @@ const createFormatResponseData = (
     status: true,
     message: "OK",
     data: {
-      sent: resSend.status == 2,
+      sent: typeof resSend?.key?.id === "string",
       status: resSend.status ?? 0,
-      message: resSend.status == 2 ? "message sent" : "fail sending message",
+      message: resSend?.key?.id ? "message sent" : "fail sending message",
       id: resSend?.key?.id,
       to: phone,
       timestamp: resSend?.messageTimestamp,

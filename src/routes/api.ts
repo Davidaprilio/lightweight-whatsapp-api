@@ -84,7 +84,6 @@ router.post(
   validate([
     body("text").not().isEmpty().withMessage("text required").trim().escape(),
     body("data").isArray().withMessage("data must by of type 'Array'"),
-    body("data.*.title").isArray().withMessage("data must by of type 'Array'"),
     body("data.*.rows").isArray().withMessage("data must by of type 'Array'"),
   ]),
   validatePhone,

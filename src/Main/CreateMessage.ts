@@ -72,7 +72,7 @@ export default class CreateMessage {
     }
     phone = formatPhoneWA(phone);
     const sent = await this.client.sendMessageWithTyping(phone, this.payload);
-    log("disend.. ", sent);
+    log("disend.. to:", phone, sent);
     return sent;
   }
 

@@ -77,13 +77,13 @@ export const handleStart = async (cid: string, mode: boolean) => {
 };
 
 Gevent.on("device.changeMode", async (cid: string, data: any) => {
+  console.log("ganti Mode dengan handle event: ", data.mode);
   await Device.findOneAndUpdate(
     { cid },
     {
       mode: data.mode,
     }
   );
-  console.log("ganti Mode dengan handle event: ", data.mode);
 });
 
 Gevent.on("device.connection.update", async (cid: string, clientInfo: any) => {
@@ -100,5 +100,9 @@ Gevent.on("device.connection.update", async (cid: string, clientInfo: any) => {
     data["lastConnected"] = new Date();
   }
   console.log("Event: Device Connection Save To DB", clientInfo.status);
-  await Device.findOneAndUpdate({ cid }, data);
+  try {
+    await Device.findOneAndUpdate({ cid }, data);
+  } catch (error) {
+    console.log("Error Save to MongoDB: ", error);
+  }
 });
