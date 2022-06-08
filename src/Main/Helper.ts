@@ -19,7 +19,7 @@ export const formatPhoneWA = (numberPhone: string, prefix = 62) => {
   return (number += type);
 };
 
-export const jidToNumberPhone = (jid) => {
+export const jidToNumberPhone = (jid: string) => {
   jid = jid.split("@")[0];
   jid = jid.split(":")[0];
   jid = jid.replace(/[^0-9]/g, "");
