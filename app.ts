@@ -10,7 +10,6 @@ import Device from "./src/models/Device";
 import { handleStart } from "./src/controllers/deviceController";
 import apiRoutes from "./src/routes/api";
 import webRoutes from "./src/routes/web";
-const socketIO = require("socket.io");
 
 const app = express();
 const httpServer = createServer(app);
@@ -18,7 +17,7 @@ const port: Number = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 app.locals.baseURL = process.env.BASE_URL ?? `http://localhost:${port}`;
 const withWebManager = process.env.WEB_MANAGER ?? true; // WEB UI TO Manage Your Whatsapp Client
 app.use(express.static("resources/public"));
-console.log(`${app.locals.baseURL}`);
+console.log("Running on platform", process.platform);
 
 // Connet to mongoDB
 mongoose
@@ -37,9 +36,19 @@ app.use(express.json()); // for parsing application/json
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "/resources/views"));
 
+// handle signal intruption
+if (process.platform === "win32") {
+  var rl = require("readline").createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  rl.on("SIGINT", function () {
+    process.emit("SIGINT");
+  });
+}
 process.on("SIGINT", async () => {
-  console.log("(SIGINT) Shutting down...");
-  // await client.destroy()
+  console.log("(SIGINT) Shutting down...     BYE !!!");
   process.exit(0);
 });
 
@@ -65,5 +74,5 @@ if (withWebManager) {
 app.use("/api", apiRoutes);
 
 httpServer.listen(port, () => {
-  console.log(`App running on port ${port}`);
+  console.log(`App running on ${app.locals.baseURL}`);
 });
