@@ -324,7 +324,7 @@ export default class Client {
     }
     // Client Connected Horeee !!!
     else if (connection === "open") {
-      log("Connection Open", update);
+      log("Connection Open");
       this.setStatusDeviceActive();
       this.info.qrCode = null;
       this.info.authenticated = true;
@@ -333,14 +333,14 @@ export default class Client {
       if (update?.legacy?.phoneConnected === true) {
         this.info.pushName = update.legacy.user.name;
         this.info.jid = update.legacy.user.id;
-        this.info.ppURL = await this.getProfilePicture(this.info.jid);
-        this.info.phoneNumber = jidToNumberPhone(this.info.jid);
       }
       // Multi Device
       else {
-        this.info.pushName = "update.user.name";
-        this.info.jid = "update.user.id";
+        this.info.jid = this.sock.user.id;
+        this.info.pushName = this.sock.user.name;
       }
+      this.info.ppURL = await this.getProfilePicture(this.info.jid, true);
+      this.info.phoneNumber = jidToNumberPhone(this.info.jid);
     }
     // New QR Code
     else if (qr !== undefined) {
