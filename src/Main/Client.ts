@@ -59,6 +59,7 @@ export default class Client {
   private store: any;
   private logger: any;
   private isStopedByUser: boolean = false;
+  private attemptQRcode: number = 0;
 
   constructor(
     client_id: string,
@@ -325,6 +326,7 @@ export default class Client {
     // Client Connected Horeee !!!
     else if (connection === "open") {
       log("Connection Open");
+      this.attemptQRcode = 0;
       this.setStatusDeviceActive();
       this.info.qrCode = null;
       this.info.authenticated = true;
@@ -345,6 +347,13 @@ export default class Client {
     // New QR Code
     else if (qr !== undefined) {
       log("QR Code Update");
+      if (this.attemptQRcode > 5) {
+        console.log("Stoped Device because 5x not scanning QRcode (not used)");
+        this.stopSock();
+        return false;
+      } else {
+        this.attemptQRcode++;
+      }
       this.resetStatusClient();
       this.info.authenticated = false;
       this.info.qrCode = update.qr;
